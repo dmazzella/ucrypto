@@ -1,15 +1,11 @@
 # Description
 
-Micropython package for doing fast elliptic curve cryptography, specifically digital signatures.
-API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).
-
-## Compiling the cmodule into MicroPython
-
-To build such a module, compile MicroPython with an extra make flag named ```USER_C_MODULES``` set to the directory containing all modules you want included (not to the module itself).
+**Micropython package for doing fast elliptic curve cryptography, specifically digital signatures.
+API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).**
 
 ## Examples
 
- - low level
+ - low level api
     ```python
     from _crypto import ECC
 
@@ -60,7 +56,7 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
 
     ```
 
-- ufastecdsa
+- with module **ufastecdsa**
     ```python
     import hashlib
 
@@ -94,4 +90,96 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
         main()
     ```
 
-- [tests](https://github.com/dmazzella/ucrypto/tree/master/tests)
+- **for other examples:** [tests](https://github.com/dmazzella/ucrypto/tree/master/tests)
+
+# Compiling the cmodule into MicroPython
+
+To build such a module, compile MicroPython with an extra make flag named ```USER_C_MODULES``` set to the directory containing all modules you want included (not to the module itself).
+
+
+- Example:
+    ```bash
+    ➜  ~ git clone https://github.com/micropython/micropython.git micropython
+    ➜  ~ cd micropython
+    ➜  micropython (master) ✗ git submodule update --init
+    ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/stm32/boards/PYBD_SF6/cmodules/ucrypto
+    ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/stm32/ BOARD="PYBD_SF6" USER_C_MODULES="$(pwd)/ports/stm32/boards/PYBD_SF6/cmodules"
+    ```
+
+## Build size:
+
+The build size depends on the asm optimizations of the tomsfastmath library that are enabled into ```ucrypto/tomsfastmath/tfm_mpi.h```
+```c
+#define TFM_ECC192
+#define TFM_ECC224
+#define TFM_ECC256
+#define TFM_ECC384
+#define TFM_ECC512
+#define TFM_RSA512
+#define TFM_RSA1024
+#define TFM_RSA2048
+```
+- PYBD_SF6 without ucrypto:
+    ```
+    LINK build-PYBD_SF6/firmware.elf
+    text	   data	    bss	    dec	    hex	filename
+    1012856	    328	 100576	1113760	 10fea0	build-PYBD_SF6/firmware.elf
+    ```
+- PYBD_SF6 with ucrypto and full tomsfastmath asm optimizations:
+    ```
+    LINK build-PYBD_SF6/firmware.elf
+    text	   data	    bss	    dec	    hex	filename
+    1209976	    452	 101600	1312028	 14051c	build-PYBD_SF6/firmware.elf
+    ```
+- PYBD_SF6 with ucrypto and without tomsfastmath RSA asm optimizations:
+    ```c
+    #define TFM_ECC192
+    #define TFM_ECC224
+    #define TFM_ECC256
+    #define TFM_ECC384
+    #define TFM_ECC512
+    // #define TFM_RSA512
+    // #define TFM_RSA1024
+    // #define TFM_RSA2048
+    ```
+    ```
+    LINK build-PYBD_SF6/firmware.elf
+    text	   data	    bss	    dec	    hex	filename
+    1042552	    452	 101600	1144604	 11771c	build-PYBD_SF6/firmware.elf
+    ```
+- PYBD_SF6 with ucrypto and with tomsfastmath only ECC 256 asm optimizations:
+    ```c
+    // #define TFM_ECC192
+    // #define TFM_ECC224
+    #define TFM_ECC256
+    // #define TFM_ECC384
+    // #define TFM_ECC512
+    // #define TFM_RSA512
+    // #define TFM_RSA1024
+    // #define TFM_RSA2048
+    ```
+    ```
+    LINK build-PYBD_SF6/firmware.elf
+    text	   data	    bss	    dec	    hex	filename
+    1034872	    452	 101600	1136924	 11591c	build-PYBD_SF6/firmware.elf
+    ```
+
+To see which optimizations are enabled in the build:
+```python
+MicroPython v1.15-83-g9eea51b73-dirty on 2021-05-08; PYBD-SF6W with STM32F767IIK
+Type "help()" for more information.
+>>> import _crypto
+>>> print(_crypto.NUMBER.ident())
+TomsFastMath v0.13.1-next
+
+Sizeofs
+	fp_digit = 4
+	fp_word  = 8
+
+FP_MAX_SIZE = 4352
+
+Defines: 
+ TFM_ARM  TFM_ECC192  TFM_ECC224  TFM_ECC256  TFM_ECC384  TFM_ECC512  TFM_RSA512  TFM_RSA1024  TFM_RSA2048  TFM_ASM  TFM_MUL6  TFM_SQR6  TFM_MUL7  TFM_SQR7  TFM_MUL8  TFM_SQR8  TFM_MUL12  TFM_SQR12  TFM_SMALL_SET  TFM_MUL17  TFM_SQR17  TFM_MUL32  TFM_SQR32  TFM_MUL64  TFM_SQR64 
+
+>>>
+```
