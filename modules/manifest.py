@@ -1,0 +1,14 @@
+freeze(
+    ".",
+    (
+        "ufastecdsa/__init__.py",
+        "ufastecdsa/curve.py",
+        "ufastecdsa/ecdsa.py",
+        "ufastecdsa/keys.py",
+        "ufastecdsa/point.py",
+        "ufastecdsa/signature.py",
+        "ufastecdsa/util.py",
+        "hmac.py"
+    ),
+    opt=3,
+)
