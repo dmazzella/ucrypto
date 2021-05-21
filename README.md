@@ -5,7 +5,41 @@ API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) a
 
 ## Examples
 
- - low level api
+- Signing and Verifying **ufastecdsa**
+    ```python
+    import hashlib
+
+    try:
+        from ufastecdsa import curve, ecdsa, keys, util
+        get_bit_length = util.get_bit_length
+    except ImportError:
+        from fastecdsa import curve, ecdsa, keys, util
+        get_bit_length = int.bit_length
+
+    def main():
+
+        # private_key = 82378264402520040413352233063555671940555718680152892238371187003380781159101
+        # public_key = keys.get_public_key(private_key, curve.P256)
+
+        private_key, public_key = keys.gen_keypair(curve.P256)
+        print("private_key:", private_key)
+        print("public_key:", public_key.x, public_key.y, public_key.curve.name)
+
+        m = "a message to sign via ECDSA"
+
+        r, s = ecdsa.sign(m, private_key)
+
+        print("R:", r)
+        print("S:", s)
+
+        verified = ecdsa.verify((r, s), m, public_key)
+        print(verified)
+
+    if __name__ == "__main__":
+        main()
+    ```
+
+ - Arbitrary Elliptic Curve Arithmetic
     ```python
     from _crypto import ECC
 
@@ -56,40 +90,6 @@ API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) a
 
     ```
 
-- with module **ufastecdsa**
-    ```python
-    import hashlib
-
-    try:
-        from ufastecdsa import curve, ecdsa, keys, util
-        get_bit_length = util.get_bit_length
-    except ImportError:
-        from fastecdsa import curve, ecdsa, keys, util
-        get_bit_length = int.bit_length
-
-    def main():
-
-        # private_key = 82378264402520040413352233063555671940555718680152892238371187003380781159101
-        # public_key = keys.get_public_key(private_key, curve.P256)
-
-        private_key, public_key = keys.gen_keypair(curve.P256)
-        print("private_key:", private_key)
-        print("public_key:", public_key.x, public_key.y, public_key.curve.name)
-
-        m = "a message to sign via ECDSA"
-
-        r, s = ecdsa.sign(m, private_key)
-
-        print("R:", r)
-        print("S:", s)
-
-        verified = ecdsa.verify((r, s), m, public_key)
-        print(verified)
-
-    if __name__ == "__main__":
-        main()
-    ```
-
 - **for other examples:** [tests](https://github.com/dmazzella/ucrypto/tree/master/tests)
 
 # Compiling the cmodule into MicroPython
@@ -119,17 +119,32 @@ The build size depends on the asm optimizations of the tomsfastmath library that
 #define TFM_RSA1024
 #define TFM_RSA2048
 ```
+asm optimizations enabled by default
+```c
+#define TFM_ECC256
+```
+
 - PYBD_SF6 without ucrypto:
     ```
     LINK build-PYBD_SF6/firmware.elf
     text	   data	    bss	    dec	    hex	filename
     1012856	    328	 100576	1113760	 10fea0	build-PYBD_SF6/firmware.elf
     ```
-- PYBD_SF6 with ucrypto and full tomsfastmath asm optimizations:
+- PYBD_SF6 with ucrypto and with tomsfastmath only ECC 256 asm optimizations (**default**):
+    ```c
+    // #define TFM_ECC192
+    // #define TFM_ECC224
+    #define TFM_ECC256
+    // #define TFM_ECC384
+    // #define TFM_ECC512
+    // #define TFM_RSA512
+    // #define TFM_RSA1024
+    // #define TFM_RSA2048
+    ```
     ```
     LINK build-PYBD_SF6/firmware.elf
     text	   data	    bss	    dec	    hex	filename
-    1209976	    452	 101600	1312028	 14051c	build-PYBD_SF6/firmware.elf
+    1034872	    452	 101600	1136924	 11591c	build-PYBD_SF6/firmware.elf
     ```
 - PYBD_SF6 with ucrypto and without tomsfastmath RSA asm optimizations:
     ```c
@@ -147,21 +162,11 @@ The build size depends on the asm optimizations of the tomsfastmath library that
     text	   data	    bss	    dec	    hex	filename
     1042552	    452	 101600	1144604	 11771c	build-PYBD_SF6/firmware.elf
     ```
-- PYBD_SF6 with ucrypto and with tomsfastmath only ECC 256 asm optimizations:
-    ```c
-    // #define TFM_ECC192
-    // #define TFM_ECC224
-    #define TFM_ECC256
-    // #define TFM_ECC384
-    // #define TFM_ECC512
-    // #define TFM_RSA512
-    // #define TFM_RSA1024
-    // #define TFM_RSA2048
-    ```
+- PYBD_SF6 with ucrypto and full tomsfastmath asm optimizations:
     ```
     LINK build-PYBD_SF6/firmware.elf
     text	   data	    bss	    dec	    hex	filename
-    1034872	    452	 101600	1136924	 11591c	build-PYBD_SF6/firmware.elf
+    1209976	    452	 101600	1312028	 14051c	build-PYBD_SF6/firmware.elf
     ```
 
 To see which optimizations are enabled in the build:
