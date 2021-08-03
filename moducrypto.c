@@ -1104,7 +1104,7 @@ STATIC void ec_point_shamirs_trick(ecc_point_t *rop, const ecc_point_t *point1, 
     }
 }
 
-STATIC void ecdsa_s(ecdsa_signature_t *sig, char *msg, size_t msg_len, fp_int d, fp_int k, const ecc_curve_t *curve)
+STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, fp_int d, fp_int k, const ecc_curve_t *curve)
 {
     fp_int e, kinv;
 
@@ -1115,10 +1115,11 @@ STATIC void ecdsa_s(ecdsa_signature_t *sig, char *msg, size_t msg_len, fp_int d,
     fp_copy((fp_int *)&R.x, (fp_int *)&sig->r);
     fp_mod((fp_int *)&sig->r, (fp_int *)&curve->q, (fp_int *)&sig->r);
 
-    fp_read_unsigned_bin(&e, (const unsigned char *)msg, msg_len);
+    // convert digest to integer (digest is computed as hex in ecdsa.py)
+    fp_read_radix(&e, (const char *)msg, 16);
 
     int orderBits = fp_count_bits((fp_int *)&curve->q);
-    int digestBits = fp_count_bits((fp_int *)&e);
+    int digestBits = msg_len * 4;
 
     if (digestBits > orderBits)
     {
@@ -1138,7 +1139,7 @@ STATIC void ecdsa_s(ecdsa_signature_t *sig, char *msg, size_t msg_len, fp_int d,
     fp_mod((fp_int *)&sig->s, (fp_int *)&curve->q, (fp_int *)&sig->s);
 }
 
-STATIC int ecdsa_v(ecdsa_signature_t *sig, char *msg, size_t msg_len, ecc_point_t *Q, const ecc_curve_t *curve)
+STATIC int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, ecc_point_t *Q, const ecc_curve_t *curve)
 {
     fp_int e, w, u1, u2;
     ecc_point_t tmp;
@@ -1148,10 +1149,11 @@ STATIC int ecdsa_v(ecdsa_signature_t *sig, char *msg, size_t msg_len, ecc_point_
     fp_init(&tmp.x);
     fp_init(&tmp.y);
 
-    fp_read_unsigned_bin(&e, (const unsigned char *)msg, msg_len);
+    // convert digest to integer (digest is computed as hex in ecdsa.py)
+    fp_read_radix(&e, (const char *)msg, 16);
 
     int orderBits = fp_count_bits((fp_int *)&curve->q);
-    int digestBits = fp_count_bits((fp_int *)&e);
+    int digestBits = msg_len * 4;
 
     if (digestBits > orderBits)
     {

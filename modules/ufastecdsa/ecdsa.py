@@ -1,5 +1,6 @@
 # coding=utf-8
 # pylint: disable=E0401
+import binascii
 import hashlib
 
 import _crypto
@@ -28,7 +29,8 @@ def sign(msg, d, curve=P256, hashfunc=hashlib.sha256, nonce=None):
     else:
         k = ks
     digest = hashfunc(msg).digest()
-    signature = _crypto.ECC.ecdsa_sign(digest, d, k, curve._curve)
+    hex_digest = binascii.hexlify(digest)
+    signature = _crypto.ECC.ecdsa_sign(hex_digest, d, k, curve._curve)
     return signature.r, signature.s
 
 
@@ -51,4 +53,5 @@ def verify(signature, message, Q, curve=P256, hashfunc=hashlib.sha256):
         raise InvalidSignature("s is not a positive int smaller than the curve order")
 
     digest = hashfunc(message).digest()
-    return _crypto.ECC.ecdsa_verify(signature, digest, Q._point, curve._curve)
+    hex_digest = binascii.hexlify(digest)
+    return _crypto.ECC.ecdsa_verify(signature, hex_digest, Q._point, curve._curve)

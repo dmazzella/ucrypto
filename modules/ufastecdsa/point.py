@@ -18,13 +18,13 @@ class Point(object):
 
         self._point = _crypto.ECC.Point(x, y, curve._curve)
         self._curve = Curve(
+            self._point.curve.name,
             self._point.curve.p,
             self._point.curve.a,
             self._point.curve.b,
             self._point.curve.q,
             self._point.curve.gx,
             self._point.curve.gy,
-            name=self._point.curve.name,
             oid=self._point.curve.oid,
         )
 

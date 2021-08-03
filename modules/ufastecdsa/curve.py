@@ -11,7 +11,7 @@ class CurveNotFoundError(Exception):
 
 
 class Curve(object):
-    def __init__(self, p, a, b, q, gx, gy, name=None, oid=None):
+    def __init__(self, name, p, a, b, q, gx, gy, oid=None):
         self._curve = _crypto.ECC.Curve(p, a, b, q, gx, gy, name=name, oid=oid)
 
     @classmethod
@@ -58,16 +58,16 @@ class Curve(object):
             yield item
 
 P256 = Curve(
+    "P256",
     0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF,
     0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC,
     0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B,
     0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551,
     0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
     0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5,
-    name="P256",
-    oid="2a8648ce3d030107",
+    oid=b'\x2A\x86\x48\xCE\x3D\x03\x01\x07',
 )
 
 _CURVE_OIDS = {
-    "2a8648ce3d030107": P256
+    b'\x2A\x86\x48\xCE\x3D\x03\x01\x07': P256
 }
