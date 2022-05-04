@@ -31,6 +31,7 @@
 #include <string.h>
 
 #include "py/nlr.h"
+#include "py/obj.h"
 #include "py/objstr.h"
 #include "py/objint.h"
 #include "py/objtuple.h"
@@ -40,7 +41,7 @@
 #include "py/stream.h"
 #include "py/runtime.h"
 
-#if defined(MICROPY_PY_UCRYPTO)
+#include "tomsfastmath/tfm_mpi.h"
 
 STATIC vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
 {
@@ -103,12 +104,6 @@ STATIC vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
     return vstr_out;
 }
 
-#if defined(MICROPY_PY_UCRYPTO_NUMBER)
-
-#include "tomsfastmath/tfm_mpi.h"
-
-#if defined(MICROPY_PY_UCRYPTO_NUMBER) || defined(MICROPY_PY_UCRYPTO_PUBLIC_KEY)
-
 STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
 {
     if (MP_OBJ_IS_SMALL_INT(arg))
@@ -159,10 +154,6 @@ STATIC mp_obj_t mp_obj_new_int_from_fp(const fp_int *fp, uint8_t base)
     vstr_t *vstr_out = vstr_from_fp((fp_int *)fp, base);
     return mp_parse_num_integer(vstr_out->buf, vstr_out->len - 1, base, NULL);
 }
-
-#endif
-
-#if defined(MICROPY_PY_UCRYPTO_NUMBER)
 
 /* returns a TFM ident string useful for debugging... */
 STATIC mp_obj_t mod_ident(void)
@@ -221,15 +212,19 @@ STATIC int ucrypto_rng(unsigned char *dst, int len, void *dat)
 
 /* generate prime number */
 
+#if defined(__thumb2__) || defined(__thumb__) || defined(__arm__)
 #if !defined(malloc) && !defined(free)
-void *malloc(size_t n) {
+void *malloc(size_t n)
+{
     void *ptr = m_malloc(n);
     return ptr;
 }
 
-void free(void *ptr) {
+void free(void *ptr)
+{
     m_free(ptr);
 }
+#endif
 #endif
 
 STATIC mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
@@ -322,10 +317,6 @@ STATIC mp_obj_type_t number_type = {
     .print = number_print,
     .locals_dict = (void *)&number_locals_dict,
 };
-
-#endif /* MICROPY_PY_UCRYPTO_NUMBER */
-
-#if defined(MICROPY_PY_UCRYPTO_PUBLIC_KEY)
 
 // point in a prime field
 typedef struct _ecc_point_t
@@ -504,7 +495,7 @@ STATIC bool ec_point_in_curve(const ecc_point_t *point, const ecc_curve_t *curve
     fp_add(&x_mul_x_mul_x, &curvea_mul_x, &right);
     fp_add(&right, (fp_int *)&curve->b, &right);
 
-    //return (left - right) % curve.p == 0
+    // return (left - right) % curve.p == 0
     fp_submod(&left, &right, (fp_int *)&curve->p, &left_minus_right_mod_curvep);
     is_point_in_curve = (fp_iszero(&left_minus_right_mod_curvep) == FP_YES);
     return is_point_in_curve;
@@ -942,7 +933,7 @@ STATIC void ec_point_double(const ecc_point_t *rop, const ecc_point_t *op, const
     fp_sub((fp_int *)&rop->x, (fp_int *)&op->x, (fp_int *)&rop->x);
     fp_mod((fp_int *)&rop->x, (fp_int *)&curve->p, (fp_int *)&rop->x);
 
-    //calculate resulting y coord
+    // calculate resulting y coord
     fp_sub((fp_int *)&op->x, (fp_int *)&rop->x, (fp_int *)&rop->y);
     fp_mul(&lambda, (fp_int *)&rop->y, (fp_int *)&rop->y);
     fp_sub((fp_int *)&rop->y, (fp_int *)&op->y, (fp_int *)&rop->y);
@@ -974,7 +965,7 @@ STATIC void ec_point_add(ecc_point_t *rop, const ecc_point_t *op1, const ecc_poi
     fp_sub((fp_int *)&rop->x, (fp_int *)&op2->x, (fp_int *)&rop->x);
     fp_mod((fp_int *)&rop->x, (fp_int *)&curve->p, (fp_int *)&rop->x);
 
-    //calculate resulting y coord
+    // calculate resulting y coord
     fp_sub((fp_int *)&op1->x, (fp_int *)&rop->x, (fp_int *)&rop->y);
     fp_mul(&lambda, (fp_int *)&rop->y, (fp_int *)&rop->y);
     fp_sub((fp_int *)&rop->y, (fp_int *)&op1->y, (fp_int *)&rop->y);
@@ -1840,18 +1831,10 @@ STATIC mp_obj_type_t ecc_type = {
     .locals_dict = (void *)&ecc_locals_dict,
 };
 
-#endif /* MICROPY_PY_UCRYPTO_PUBLIC_KEY */
-
-#endif /* MICROPY_PY_UCRYPTO_NUMBER */
-
 STATIC const mp_map_elem_t mp_module_ucrypto_globals_table[] = {
-    {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_uCrypto)},
-#if MICROPY_PY_UCRYPTO_PUBLIC_KEY
+    {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR__crypto)},
     {MP_ROM_QSTR(MP_QSTR_ECC), MP_ROM_PTR(&ecc_type)},
-#endif
-#if MICROPY_PY_UCRYPTO_NUMBER
     {MP_ROM_QSTR(MP_QSTR_NUMBER), MP_ROM_PTR(&number_type)},
-#endif
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_ucrypto_globals, mp_module_ucrypto_globals_table);
@@ -1861,13 +1844,5 @@ const mp_obj_module_t mp_module_ucrypto = {
     .globals = (mp_obj_dict_t *)&mp_module_ucrypto_globals,
 };
 
-// Source files #include'd here to make sure they're compiled in
-// only if module is enabled by config setting.
-#if defined(MICROPY_PY_UCRYPTO_NUMBER)
-#include "tomsfastmath/tfm_mpi.c"
-#endif
-
 // Register the module to make it available in Python
 MP_REGISTER_MODULE(MP_QSTR__crypto, mp_module_ucrypto, MICROPY_PY_UCRYPTO);
-
-#endif // MICROPY_PY_UCRYPTO
