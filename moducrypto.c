@@ -163,7 +163,7 @@ STATIC mp_obj_t mod_ident(void)
     vstr_t vstr_out;
     vstr_init(&vstr_out, s_len);
     vstr_add_strn(&vstr_out, s, s_len);
-    return mp_obj_new_str_from_vstr(&mp_type_str, &vstr_out);
+    return mp_obj_new_str_from_vstr(&vstr_out);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_ident_obj, mod_ident);
@@ -311,12 +311,12 @@ STATIC const mp_rom_map_elem_t number_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(number_locals_dict, number_locals_dict_table);
 
-STATIC mp_obj_type_t number_type = {
-    {&mp_type_type},
-    .name = MP_QSTR_NUMBER,
-    .print = number_print,
-    .locals_dict = (void *)&number_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    number_type,
+    MP_QSTR_NUMBER,
+    MP_TYPE_FLAG_NONE,
+    print, number_print,
+    locals_dict, &number_locals_dict);
 
 // point in a prime field
 typedef struct _ecc_point_t
@@ -368,6 +368,7 @@ typedef struct _mp_ecdsa_signature_t
 const mp_obj_type_t signature_type;
 const mp_obj_type_t curve_type;
 const mp_obj_type_t point_type;
+const mp_obj_type_t ecc_type;
 
 STATIC bool ec_signature_equal(const ecdsa_signature_t *s1, const ecdsa_signature_t *s2)
 {
@@ -418,7 +419,7 @@ STATIC void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     if (dest[0] == MP_OBJ_NULL)
     {
         const mp_obj_type_t *type = mp_obj_get_type(obj);
-        mp_map_t *locals_map = &type->locals_dict->map;
+        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
         mp_map_elem_t *elem = mp_map_lookup(locals_map, MP_OBJ_NEW_QSTR(attr), MP_MAP_LOOKUP);
         if (elem != NULL)
         {
@@ -444,14 +445,14 @@ STATIC const mp_rom_map_elem_t signature_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(signature_locals_dict, signature_locals_dict_table);
 
-const mp_obj_type_t signature_type = {
-    {&mp_type_type},
-    .name = MP_QSTR_Signature,
-    .print = signature_print,
-    .binary_op = signature_binary_op,
-    .attr = signature_attr,
-    .locals_dict = (void *)&signature_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    signature_type,
+    MP_QSTR_Signature,
+    MP_TYPE_FLAG_NONE,
+    print, signature_print,
+    binary_op, signature_binary_op,
+    attr, signature_attr,
+    locals_dict, &signature_locals_dict);
 
 STATIC bool ec_point_in_curve(const ecc_point_t *point, const ecc_curve_t *curve)
 {
@@ -626,7 +627,7 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     if (dest[0] == MP_OBJ_NULL)
     {
         const mp_obj_type_t *type = mp_obj_get_type(obj);
-        mp_map_t *locals_map = &type->locals_dict->map;
+        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
         mp_map_elem_t *elem = mp_map_lookup(locals_map, MP_OBJ_NEW_QSTR(attr), MP_MAP_LOOKUP);
         if (elem != NULL)
         {
@@ -790,14 +791,14 @@ STATIC const mp_rom_map_elem_t curve_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(curve_locals_dict, curve_locals_dict_table);
 
-const mp_obj_type_t curve_type = {
-    {&mp_type_type},
-    .name = MP_QSTR_Curve,
-    .print = curve_print,
-    .binary_op = curve_binary_op,
-    .attr = curve_attr,
-    .locals_dict = (void *)&curve_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    curve_type,
+    MP_QSTR_Curve,
+    MP_TYPE_FLAG_NONE,
+    print, curve_print,
+    binary_op, curve_binary_op,
+    attr, curve_attr,
+    locals_dict, &curve_locals_dict);
 
 STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
@@ -1485,7 +1486,7 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     if (dest[0] == MP_OBJ_NULL)
     {
         const mp_obj_type_t *type = mp_obj_get_type(obj);
-        mp_map_t *locals_map = &type->locals_dict->map;
+        mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(type, locals_dict)->map;
         mp_map_elem_t *elem = mp_map_lookup(locals_map, MP_OBJ_NEW_QSTR(attr), MP_MAP_LOOKUP);
         if (elem != NULL)
         {
@@ -1729,15 +1730,15 @@ STATIC const mp_rom_map_elem_t point_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(point_locals_dict, point_locals_dict_table);
 
-const mp_obj_type_t point_type = {
-    {&mp_type_type},
-    .name = MP_QSTR_Point,
-    .print = point_print,
-    .binary_op = point_binary_op,
-    .unary_op = point_unary_op,
-    .attr = point_attr,
-    .locals_dict = (void *)&point_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    point_type,
+    MP_QSTR_Point,
+    MP_TYPE_FLAG_NONE,
+    print, point_print,
+    binary_op, point_binary_op,
+    unary_op, point_unary_op,
+    attr, point_attr,
+    locals_dict, &point_locals_dict);
 
 STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
@@ -1824,14 +1825,14 @@ STATIC const mp_rom_map_elem_t ecc_locals_dict_table[] = {
 
 STATIC MP_DEFINE_CONST_DICT(ecc_locals_dict, ecc_locals_dict_table);
 
-STATIC mp_obj_type_t ecc_type = {
-    {&mp_type_type},
-    .name = MP_QSTR_ECC,
-    .print = ecc_print,
-    .locals_dict = (void *)&ecc_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    ecc_type,
+    MP_QSTR_ECC,
+    MP_TYPE_FLAG_NONE,
+    print, ecc_print,
+    locals_dict, &ecc_locals_dict);
 
-STATIC const mp_map_elem_t mp_module_ucrypto_globals_table[] = {
+STATIC const mp_rom_map_elem_t mp_module_ucrypto_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR__crypto)},
     {MP_ROM_QSTR(MP_QSTR_ECC), MP_ROM_PTR(&ecc_type)},
     {MP_ROM_QSTR(MP_QSTR_NUMBER), MP_ROM_PTR(&number_type)},
