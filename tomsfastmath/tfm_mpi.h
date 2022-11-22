@@ -102,14 +102,14 @@
 
 #define USE_MEMSET
 
-// #define TFM_ECC192
-// #define TFM_ECC224
+#define TFM_ECC192
+#define TFM_ECC224
 #define TFM_ECC256
-// #define TFM_ECC384
-// #define TFM_ECC512
-// #define TFM_RSA512
-// #define TFM_RSA1024
-// #define TFM_RSA2048
+#define TFM_ECC384
+#define TFM_ECC512
+#define TFM_RSA512
+#define TFM_RSA1024
+#define TFM_RSA2048
 
 #if defined(__thumb2__) || defined(__thumb__) || defined(__arm__)
 #define TFM_ARM

@@ -1,11 +1,12 @@
-import hashlib
-
 try:
     from ufastecdsa import curve, ecdsa, keys, util
+
     get_bit_length = util.get_bit_length
 except ImportError:
     from fastecdsa import curve, ecdsa, keys, util
+
     get_bit_length = int.bit_length
+
 
 def main():
 
@@ -25,6 +26,7 @@ def main():
 
     verified = ecdsa.verify((r, s), m, public_key)
     print(verified)
+
 
 if __name__ == "__main__":
     main()

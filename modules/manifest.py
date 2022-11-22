@@ -8,7 +8,13 @@ freeze(
         "ufastecdsa/point.py",
         "ufastecdsa/signature.py",
         "ufastecdsa/util.py",
-        "hmac.py"
+        "ufastrsa/__init__.py",
+        "ufastrsa/genprime.py",
+        "ufastrsa/rsa.py",
+        "ufastrsa/srandom.py",
+        "ufastrsa/util.py",
+        "functools.py",
+        "hmac.py",
     ),
     opt=3,
 )

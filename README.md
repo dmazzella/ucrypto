@@ -1,20 +1,45 @@
 # Description
 
-**Micropython package for doing fast elliptic curve cryptography, specifically digital signatures.
-API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).**
+**Micropython package for doing fast rsa and elliptic curve cryptography, specifically digital signatures.
+ECDSA API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).**
 
 ## Examples
 
+- Signing and Verifying **ufastrsa**
+    ```python
+    from ufastrsa.rsa import RSA, genrsa
+
+
+    def main():
+
+        bits = 1024
+        print("RSA bits", bits)
+        r = RSA(*genrsa(bits, e=65537))
+        if r:
+            print("RSA OK")
+            data = b"a message to sign and encrypt via RSA"
+            print("random data len:", len(data), data)
+            assert r.pkcs_verify(r.pkcs_sign(data)) == data
+            print("pkcs_verify OK")
+            assert r.pkcs_decrypt(r.pkcs_encrypt(data)) == data
+            print("pkcs_decrypt OK")
+
+
+    if __name__ == "__main__":
+        main()
+    ```
+
 - Signing and Verifying **ufastecdsa**
     ```python
-    import hashlib
-
     try:
         from ufastecdsa import curve, ecdsa, keys, util
+
         get_bit_length = util.get_bit_length
     except ImportError:
         from fastecdsa import curve, ecdsa, keys, util
+
         get_bit_length = int.bit_length
+
 
     def main():
 
@@ -34,6 +59,7 @@ API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) a
 
         verified = ecdsa.verify((r, s), m, public_key)
         print(verified)
+
 
     if __name__ == "__main__":
         main()
@@ -171,15 +197,15 @@ asm optimizations enabled by default
 
 To see which optimizations are enabled in the build:
 ```python
-MicroPython v1.15-83-g9eea51b73-dirty on 2021-05-08; PYBD-SF6W with STM32F767IIK
+MicroPython v1.19.1-705-gac5934c96-dirty on 2022-11-22; PORTENTA with STM32H747
 Type "help()" for more information.
 >>> import _crypto
 >>> print(_crypto.NUMBER.ident())
 TomsFastMath v0.13.1-next
 
 Sizeofs
-	fp_digit = 4
-	fp_word  = 8
+        fp_digit = 4
+        fp_word  = 8
 
 FP_MAX_SIZE = 4352
 
