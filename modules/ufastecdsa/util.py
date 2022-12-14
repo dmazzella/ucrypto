@@ -65,7 +65,7 @@ class RFC6979(object):
         """ http://tools.ietf.org/html/rfc6979#section-3.2 """
         h1 = self.hashfunc(self.msg)
         hash_size = 32
-        if isinstance(h1, hashlib.md5):
+        if hasattr(hashlib, "md5") and isinstance(h1, hashlib.md5):
             hash_size = 16
         if isinstance(h1, hashlib.sha1):
             hash_size = 20
