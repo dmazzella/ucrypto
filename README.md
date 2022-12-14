@@ -118,6 +118,18 @@ ECDSA API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastec
 
 - **for other examples:** [tests](https://github.com/dmazzella/ucrypto/tree/master/tests)
 
+# Optimizations are disabled by **default** for easy build on different platforms
+```c
+// #define TFM_ECC192
+// #define TFM_ECC224
+// #define TFM_ECC256
+// #define TFM_ECC384
+// #define TFM_ECC512
+// #define TFM_RSA512
+// #define TFM_RSA1024
+// #define TFM_RSA2048
+```
+
 # Compiling the cmodule into MicroPython
 
 To build such a module, compile MicroPython with an extra make flag named ```USER_C_MODULES``` set to the directory containing all modules you want included (not to the module itself).
@@ -145,10 +157,6 @@ The build size depends on the asm optimizations of the tomsfastmath library that
 #define TFM_RSA1024
 #define TFM_RSA2048
 ```
-asm optimizations enabled by default
-```c
-#define TFM_ECC256
-```
 
 - PYBD_SF6 without ucrypto:
     ```
@@ -156,7 +164,7 @@ asm optimizations enabled by default
     text	   data	    bss	    dec	    hex	filename
     1012856	    328	 100576	1113760	 10fea0	build-PYBD_SF6/firmware.elf
     ```
-- PYBD_SF6 with ucrypto and with tomsfastmath only ECC 256 asm optimizations (**default**):
+- PYBD_SF6 with ucrypto and with tomsfastmath only ECC 256 asm optimizations:
     ```c
     // #define TFM_ECC192
     // #define TFM_ECC224
