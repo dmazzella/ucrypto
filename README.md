@@ -120,6 +120,8 @@ ECDSA API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastec
 
 # Optimizations are disabled by **default** for easy build on different platforms
 ```c
+#define TFM_NO_ASM
+
 // #define TFM_ECC192
 // #define TFM_ECC224
 // #define TFM_ECC256

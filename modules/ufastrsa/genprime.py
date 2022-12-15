@@ -6,6 +6,7 @@ try:
     pow3_ = tomsfastmath.exptmod
     invmod_ = tomsfastmath.invmod
     generate_prime_ = tomsfastmath.generate_prime
+    gcd_ = tomsfastmath.gcd
 
     def genprime(num=1024, test=25, safe=False):
         return generate_prime_(num, test, safe)
@@ -20,6 +21,11 @@ except ImportError:
             a, c, d, b, e, f = b, e, f, a - q * b, c - q * e, d - q * f
         assert a >= 0 and c % g >= 0
         return a == 1 and c % g or 0
+
+    def gcd_(a, b):
+        while b:
+            a, b = b, a % b
+        return a
 
     def miller_rabin_pass(a, n):
         n_minus_one = n - 1
@@ -86,9 +92,7 @@ def get_lowest_set_bit(n):
 
 
 def gcd(a, b):
-    while b:
-        a, b = b, a % b
-    return a
+    return gcd_(a, b)
 
 
 def get_bit_length(n):

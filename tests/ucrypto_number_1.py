@@ -1,3 +1,5 @@
+from time import ticks_diff, ticks_ms
+
 try:
     from _crypto import NUMBER as tomsfastmath
 except ImportError:
@@ -12,29 +14,61 @@ x1 = 945038118366338927974390520999740647159156103861951616735057748306424473382
 y1 = 71074765520811535379138799701268298623992777006974550285436363554368439313927061208425013564629734478853799202093051832216416876398353508688951125285138098211133917836653653008704451186463461221420093373376331037115859563141818234980194754180338501042765827141801188316330168083520295124883343213843145975085
 z1 = 142149531041623070758277599402536597247985554013949100570872727108736878627854122416850027129259468957707598404186103664432833752796707017377902250570276196422267835673307306017408902372926922442840186746752662074231719126283636469960389508360677002085531654283602376632660336167040590249766686427686291950171
 
+
 def pow3(x, y, z):
     return tomsfastmath.exptmod(x, y, z)
 
+
+start = ticks_ms()
 print(pow3(x1, y1, z1))
+end = ticks_ms()
+print(ticks_diff(end, start))
 
 ################################################################################
+
 
 def invmod(a, b):
     return tomsfastmath.invmod(a, b)
 
+
+start = ticks_ms()
 print(invmod(x1, y1))
+end = ticks_ms()
+print(ticks_diff(end, start))
 
 ################################################################################
+
 
 def generate_prime(num=1024, test=25, safe=False):
     return tomsfastmath.generate_prime(num, test, safe)
 
-p = generate_prime(2048)
+
+start = ticks_ms()
+p = generate_prime(1024)
 print(p)
+end = ticks_ms()
+print(ticks_diff(end, start))
+
 
 def miller_rabin_test(n, test=25):
     return tomsfastmath.is_prime(n, test)
 
+
+start = ticks_ms()
 print(miller_rabin_test(p))
+end = ticks_ms()
+print(ticks_diff(end, start))
+
+################################################################################
+
+
+def gcd(a, b):
+    return tomsfastmath.gcd(a, b)
+
+
+start = ticks_ms()
+print(gcd(x1, y1))
+end = ticks_ms()
+print(ticks_diff(end, start))
 
 ################################################################################

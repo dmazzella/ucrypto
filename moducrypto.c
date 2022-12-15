@@ -120,9 +120,10 @@ STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
 
 STATIC char *mpz_as_str(const mpz_t *i, unsigned int base)
 {
-    char *s = m_new(char, mp_int_format_size(mpz_max_num_bits(i), base, NULL, '\0'));
-    mpz_as_str_inpl(i, base, NULL, 'a', '\0', s);
-    return s;
+    vstr_t vstr;
+    vstr_init_len(&vstr, mp_int_format_size(mpz_max_num_bits(i), base, NULL, '\0'));
+    mpz_as_str_inpl(i, base, NULL, 'a', '\0', vstr.buf);
+    return vstr.buf;
 }
 
 STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
@@ -130,8 +131,7 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
     mpz_t arp_temp;
     fp_init(ft_tmp);
     mpz_t *arp_p = mp_mpz_for_int(arg, &arp_temp);
-    char *s = mpz_as_str(arp_p, base);
-    fp_read_radix(ft_tmp, s, base);
+    fp_read_radix(ft_tmp, mpz_as_str(arp_p, base), base);
     if (arp_p == &arp_temp)
     {
         mpz_deinit(arp_p);
@@ -139,20 +139,20 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
     return true;
 }
 
-STATIC vstr_t *vstr_from_fp(const fp_int *fp, int base)
+STATIC vstr_t vstr_from_fp(const fp_int *fp, int base)
 {
     int size_fp;
     fp_radix_size((fp_int *)fp, base, &size_fp);
-    vstr_t *vstr_fp = vstr_new(size_fp);
-    vstr_fp->len = size_fp;
-    fp_toradix_n((fp_int *)fp, vstr_fp->buf, base, size_fp);
+    vstr_t vstr_fp;
+    vstr_init_len(&vstr_fp, size_fp);
+    fp_toradix_n((fp_int *)fp, vstr_fp.buf, base, size_fp);
     return vstr_fp;
 }
 
 STATIC mp_obj_t mp_obj_new_int_from_fp(const fp_int *fp, uint8_t base)
 {
-    vstr_t *vstr_out = vstr_from_fp((fp_int *)fp, base);
-    return mp_parse_num_integer(vstr_out->buf, vstr_out->len - 1, base, NULL);
+    vstr_t vstr_out = vstr_from_fp((fp_int *)fp, base);
+    return mp_parse_num_integer(vstr_out.buf, vstr_out.len - 1, base, NULL);
 }
 
 /* returns a TFM ident string useful for debugging... */
@@ -199,6 +199,21 @@ STATIC mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_invmod_obj, mod_invmod);
 STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_invmod_obj, MP_ROM_PTR(&mod_invmod_obj));
+
+/* c = (a, b) */
+STATIC mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
+{
+    size_t base = 10;
+    fp_int a_fp_int, b_fp_int, c_fp_int;
+    fp_init(&c_fp_int);
+    mp_fp_for_int(A_in, &a_fp_int, base);
+    mp_fp_for_int(B_in, &b_fp_int, base);
+    fp_gcd(&a_fp_int, &b_fp_int, &c_fp_int);
+    return mp_obj_new_int_from_fp(&c_fp_int, base);
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_gcd_obj, mod_gcd);
+STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_gcd_obj, MP_ROM_PTR(&mod_gcd_obj));
 
 STATIC int ucrypto_rng(unsigned char *dst, int len, void *dat)
 {
@@ -305,6 +320,7 @@ STATIC const mp_rom_map_elem_t number_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_ident), MP_ROM_PTR(&mod_static_ident_obj)},
     {MP_ROM_QSTR(MP_QSTR_exptmod), MP_ROM_PTR(&mod_static_exptmod_obj)},
     {MP_ROM_QSTR(MP_QSTR_invmod), MP_ROM_PTR(&mod_static_invmod_obj)},
+    {MP_ROM_QSTR(MP_QSTR_gcd), MP_ROM_PTR(&mod_static_gcd_obj)},
     {MP_ROM_QSTR(MP_QSTR_generate_prime), MP_ROM_PTR(&mod_static_generate_prime_obj)},
     {MP_ROM_QSTR(MP_QSTR_is_prime), MP_ROM_PTR(&mod_static_is_prime_obj)},
 };
@@ -390,8 +406,8 @@ STATIC void signature_print(const mp_print_t *print, mp_obj_t self_in, mp_print_
     mp_printf(
         print,
         "<Signature r=%s s=%s>",
-        vstr_from_fp((fp_int *)&self->ecdsa_signature.r, self->ecdsa_signature.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecdsa_signature.s, self->ecdsa_signature.radix)->buf);
+        vstr_from_fp((fp_int *)&self->ecdsa_signature.r, self->ecdsa_signature.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecdsa_signature.s, self->ecdsa_signature.radix).buf);
 }
 
 STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
@@ -580,12 +596,12 @@ STATIC void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
         "<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>",
         self->ecc_curve.name.buf,
         vstr_str(&vstr_oid),
-        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix)->buf);
+        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix).buf);
 }
 
 STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
@@ -1468,16 +1484,16 @@ STATIC void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     mp_printf(
         print,
         "<Point x=%s y=%s curve=<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>>",
-        vstr_from_fp((fp_int *)&self->ecc_point.x, self->ecc_point.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_point.y, self->ecc_point.radix)->buf,
+        vstr_from_fp((fp_int *)&self->ecc_point.x, self->ecc_point.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_point.y, self->ecc_point.radix).buf,
         self->ecc_curve.name.buf,
         vstr_str(&vstr_oid),
-        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix)->buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix)->buf);
+        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix).buf,
+        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix).buf);
 }
 
 STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)

@@ -102,6 +102,8 @@
 
 #define USE_MEMSET
 
+#define TFM_NO_ASM
+
 // #define TFM_ECC192
 // #define TFM_ECC224
 // #define TFM_ECC256
