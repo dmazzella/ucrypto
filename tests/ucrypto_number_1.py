@@ -15,6 +15,20 @@ y1 = 710747655208115353791387997012682986239927770069745502854363635543684393139
 z1 = 142149531041623070758277599402536597247985554013949100570872727108736878627854122416850027129259468957707598404186103664432833752796707017377902250570276196422267835673307306017408902372926922442840186746752662074231719126283636469960389508360677002085531654283602376632660336167040590249766686427686291950171
 
 
+def fast_pow(x: int, e: int, m: int) -> int:
+    X = x
+    E = e
+    Y = 1
+    while E > 0:
+        if E % 2 == 0:
+            X = (X * X) % m
+            E = E // 2
+        else:
+            Y = (X * Y) % m
+            E = E - 1
+    return Y
+
+
 def pow3(x, y, z):
     return tomsfastmath.exptmod(x, y, z)
 
@@ -22,9 +36,17 @@ def pow3(x, y, z):
 start = ticks_ms()
 print(pow3(x1, y1, z1))
 end = ticks_ms()
-print(ticks_diff(end, start))
+print("pow3", ticks_diff(end, start))
+start = ticks_ms()
+print(pow(x1, y1, z1))
+end = ticks_ms()
+print("pow", ticks_diff(end, start))
+start = ticks_ms()
+print(fast_pow(x1, y1, z1))
+end = ticks_ms()
+print("fast_pow", ticks_diff(end, start))
 
-################################################################################
+# ################################################################################
 
 
 def invmod(a, b):
@@ -34,7 +56,7 @@ def invmod(a, b):
 start = ticks_ms()
 print(invmod(x1, y1))
 end = ticks_ms()
-print(ticks_diff(end, start))
+print("invmod", ticks_diff(end, start))
 
 ################################################################################
 
@@ -47,7 +69,7 @@ start = ticks_ms()
 p = generate_prime(1024)
 print(p)
 end = ticks_ms()
-print(ticks_diff(end, start))
+print("generate_prime", ticks_diff(end, start))
 
 
 def miller_rabin_test(n, test=25):
@@ -57,7 +79,7 @@ def miller_rabin_test(n, test=25):
 start = ticks_ms()
 print(miller_rabin_test(p))
 end = ticks_ms()
-print(ticks_diff(end, start))
+print("miller_rabin_test", ticks_diff(end, start))
 
 ################################################################################
 
@@ -69,6 +91,6 @@ def gcd(a, b):
 start = ticks_ms()
 print(gcd(x1, y1))
 end = ticks_ms()
-print(ticks_diff(end, start))
+print("gcd", ticks_diff(end, start))
 
 ################################################################################

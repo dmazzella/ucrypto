@@ -169,6 +169,47 @@ STATIC mp_obj_t mod_ident(void)
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_ident_obj, mod_ident);
 STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_ident_obj, MP_ROM_PTR(&mod_ident_obj));
 
+static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
+{
+    fp_int x;
+    fp_int e;
+    fp_int y;
+
+    fp_init(&x);
+    fp_init(&e);
+    fp_init(&y);
+
+    fp_copy(X, &x);
+    fp_copy(E, &e);
+    fp_set(&y, 1);
+
+    // while E > 0:
+    while (fp_cmp_d(&e, 0) == FP_GT)
+    {
+        // if E % 2 == 0:
+        fp_digit Emod2;
+        fp_mod_d(&e, 2, &Emod2);
+        if (Emod2 == 0)
+        {
+            // X = (X * X) % m
+            fp_mulmod(&x, &x, M, &x);
+            // E = E / 2
+            fp_div_2(&e, &e);
+        }
+        else
+        {
+            // Y = (X * Y) % m
+            fp_mulmod(&x, &y, M, &y);
+            // E = E - 1
+            fp_sub_d(&e, 1, &e);
+        }
+    }
+
+    fp_copy(&y, Y);
+
+    return FP_OKAY;
+}
+
 /* d = a**b (mod c) */
 STATIC mp_obj_t mod_exptmod(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
 {
@@ -178,7 +219,11 @@ STATIC mp_obj_t mod_exptmod(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
     mp_fp_for_int(A_in, &a_fp_int, base);
     mp_fp_for_int(B_in, &b_fp_int, base);
     mp_fp_for_int(C_in, &c_fp_int, base);
-    fp_exptmod(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+
+    if (fp_exptmod(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int) != FP_OKAY)
+    {
+        fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+    }
     return mp_obj_new_int_from_fp(&d_fp_int, base);
 }
 
