@@ -192,7 +192,7 @@ static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
         if (Emod2 == 0)
         {
             // X = (X * X) % m
-            fp_mulmod(&x, &x, M, &x);
+            fp_sqrmod(&x, M, &x);
             // E = E / 2
             fp_div_2(&e, &e);
         }
