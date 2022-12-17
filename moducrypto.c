@@ -210,8 +210,7 @@ static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
     return FP_OKAY;
 }
 
-/* d = a**b (mod c) */
-STATIC mp_obj_t mod_exptmod(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
+STATIC mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
 {
     size_t base = 10;
     fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
@@ -220,14 +219,58 @@ STATIC mp_obj_t mod_exptmod(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
     mp_fp_for_int(B_in, &b_fp_int, base);
     mp_fp_for_int(C_in, &c_fp_int, base);
 
-    if (fp_exptmod(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int) != FP_OKAY)
-    {
-        fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
-    }
+    fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+
     return mp_obj_new_int_from_fp(&d_fp_int, base);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_exptmod_obj, mod_exptmod);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_fast_pow_obj, mod_fast_pow);
+STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_fast_pow_obj, MP_ROM_PTR(&mod_fast_pow_obj));
+
+/* d = a**b (mod c) */
+STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+{
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_a, MP_ARG_OBJ, {.u_obj = mp_const_none}},
+        {MP_QSTR_b, MP_ARG_OBJ, {.u_obj = mp_const_none}},
+        {MP_QSTR_c, MP_ARG_OBJ, {.u_obj = mp_const_none}},
+        {MP_QSTR_safe, MP_ARG_BOOL, {.u_bool = false}},
+    };
+
+    struct
+    {
+        mp_arg_val_t a, b, c, safe;
+    } args;
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);
+
+    size_t base = 10;
+    fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
+    fp_init(&d_fp_int);
+    mp_fp_for_int(args.a.u_obj, &a_fp_int, base);
+    mp_fp_for_int(args.b.u_obj, &b_fp_int, base);
+    mp_fp_for_int(args.c.u_obj, &c_fp_int, base);
+
+    // the montgomery reduce need odd modulus
+    if (fp_isodd(&c_fp_int) == FP_YES)
+    {
+        fp_exptmod(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+    }
+    else
+    {
+        if (args.safe.u_bool)
+        {
+            fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+        }
+        else
+        {
+            mp_raise_ValueError(MP_ERROR_TEXT("'exptmod' need odd modulus, set 'safe' or use 'fast_pow'"));
+        }
+    }
+
+    return mp_obj_new_int_from_fp(&d_fp_int, base);
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_exptmod_obj, 3, mod_exptmod);
 STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_exptmod_obj, MP_ROM_PTR(&mod_exptmod_obj));
 
 /* c = 1/a (mod b) */
@@ -364,6 +407,7 @@ STATIC void number_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kin
 STATIC const mp_rom_map_elem_t number_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_ident), MP_ROM_PTR(&mod_static_ident_obj)},
     {MP_ROM_QSTR(MP_QSTR_exptmod), MP_ROM_PTR(&mod_static_exptmod_obj)},
+    {MP_ROM_QSTR(MP_QSTR_fast_pow), MP_ROM_PTR(&mod_static_fast_pow_obj)},
     {MP_ROM_QSTR(MP_QSTR_invmod), MP_ROM_PTR(&mod_static_invmod_obj)},
     {MP_ROM_QSTR(MP_QSTR_gcd), MP_ROM_PTR(&mod_static_gcd_obj)},
     {MP_ROM_QSTR(MP_QSTR_generate_prime), MP_ROM_PTR(&mod_static_generate_prime_obj)},
