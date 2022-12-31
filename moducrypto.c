@@ -1020,16 +1020,32 @@ STATIC bool ec_point_equal(const ecc_point_t *p1, const ecc_point_t *p2)
 
 STATIC void ec_point_double(const ecc_point_t *rop, const ecc_point_t *op, const ecc_curve_t *curve)
 {
+    if (fp_cmp_d((fp_int *)&op->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op->y, 0) == FP_EQ)
+    {
+        fp_set((fp_int *)&rop->x, 0);
+        fp_set((fp_int *)&rop->y, 0);
+        return;
+    }
+
     fp_int numer, denom, lambda;
     fp_init(&numer);
     fp_init(&denom);
     fp_init(&lambda);
+
     // calculate lambda
     fp_mul((fp_int *)&op->x, (fp_int *)&op->x, &numer);
     fp_mul_d(&numer, 3, &numer);
     fp_add(&numer, (fp_int *)&curve->a, &numer);
     fp_mul_d((fp_int *)&op->y, 2, &denom);
-    fp_invmod(&denom, (fp_int *)&curve->p, &denom);
+
+    // handle 2P = identity case
+    if (fp_invmod(&denom, (fp_int *)&curve->p, &denom) != FP_OKAY)
+    {
+        fp_set((fp_int *)&rop->x, 0);
+        fp_set((fp_int *)&rop->y, 0);
+        return;
+    }
+
     fp_mul(&numer, &denom, &lambda);
     fp_mod(&lambda, (fp_int *)&curve->p, &lambda);
 
@@ -1048,11 +1064,43 @@ STATIC void ec_point_double(const ecc_point_t *rop, const ecc_point_t *op, const
 
 STATIC void ec_point_add(ecc_point_t *rop, const ecc_point_t *op1, const ecc_point_t *op2, const ecc_curve_t *curve)
 {
+    // handle the identity element
+    if (fp_cmp_d((fp_int *)&op1->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op1->y, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->y, 0) == FP_EQ)
+    {
+        fp_set((fp_int *)&rop->x, 0);
+        fp_set((fp_int *)&rop->y, 0);
+        return;
+    }
+    else if (fp_cmp_d((fp_int *)&op1->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op1->y, 0) == FP_EQ)
+    {
+        fp_copy((fp_int *)&op2->x, &rop->x);
+        fp_copy((fp_int *)&op2->y, &rop->y);
+        return;
+    }
+    else if (fp_cmp_d((fp_int *)&op2->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->y, 0) == FP_EQ)
+    {
+        fp_copy((fp_int *)&op1->x, &rop->x);
+        fp_copy((fp_int *)&op1->y, &rop->y);
+        return;
+    }
+
     if (ec_point_equal(op1, op2))
     {
         ec_point_double(rop, op1, curve);
         return;
     }
+
+    // check if points sum to identity element
+    fp_int negy;
+    fp_init(&negy);
+    fp_sub((fp_int *)&curve->p, (fp_int *)&op2->y, &negy);
+    if (fp_cmp((fp_int *)&op1->x, (fp_int *)&op2->x) == FP_EQ && fp_cmp((fp_int *)&op1->y, &negy) == 0)
+    {
+        fp_set((fp_int *)&rop->x, 0);
+        fp_set((fp_int *)&rop->y, 0);
+        return;
+    }
+
     fp_int xdiff, ydiff, lambda;
     fp_init(&xdiff);
     fp_init(&ydiff);
@@ -1080,6 +1128,14 @@ STATIC void ec_point_add(ecc_point_t *rop, const ecc_point_t *op1, const ecc_poi
 
 STATIC void ec_point_mul(ecc_point_t *rop, const ecc_point_t *point, const fp_int scalar, const ecc_curve_t *curve)
 {
+    // handle the identity element
+    if (fp_cmp_d((fp_int *)&point->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&point->y, 0) == FP_EQ)
+    {
+        fp_set((fp_int *)&rop->x, 0);
+        fp_set((fp_int *)&rop->y, 0);
+        return;
+    }
+
     bool scalar_is_negative = false;
     if (fp_cmp_d((fp_int *)&scalar, 2) == FP_EQ)
     {
@@ -1207,6 +1263,8 @@ STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, 
 
     // R = k * G, r = R[x]
     ecc_point_t R;
+    fp_init(&R.x);
+    fp_init(&R.y);
     ec_point_mul(&R, &curve->g, k, curve);
     fp_init(&sig->r);
     fp_copy((fp_int *)&R.x, (fp_int *)&sig->r);

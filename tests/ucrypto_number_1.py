@@ -1,3 +1,6 @@
+import random
+import sys
+
 from time import ticks_diff, ticks_ms
 
 try:
@@ -35,22 +38,27 @@ def exptmod(x, y, z, safe=True):
     return tomsfastmath.exptmod(x, y, z, safe)
 
 
-start = ticks_ms()
-print(exptmod(x1, y1, z1))
-end = ticks_ms()
-print("exptmod", ticks_diff(end, start))
-start = ticks_ms()
-print(fast_pow(x1, y1, z1))
-end = ticks_ms()
-print("fast_pow", ticks_diff(end, start))
-start = ticks_ms()
-print(pow(x1, y1, z1))
-end = ticks_ms()
-print("pow", ticks_diff(end, start))
-start = ticks_ms()
-print(pow3(x1, y1, z1))
-end = ticks_ms()
-print("pow3", ticks_diff(end, start))
+for i in range(0, 5):
+    start = ticks_ms()
+    print(exptmod(x1, y1, z1))
+    end = ticks_ms()
+    print("exptmod", ticks_diff(end, start))
+    start = ticks_ms()
+    print(fast_pow(x1, y1, z1))
+    end = ticks_ms()
+    print("fast_pow", ticks_diff(end, start))
+    start = ticks_ms()
+    print(pow(x1, y1, z1))
+    end = ticks_ms()
+    print("pow", ticks_diff(end, start))
+    start = ticks_ms()
+    print(pow3(x1, y1, z1))
+    end = ticks_ms()
+    print("pow3", ticks_diff(end, start))
+
+    x1 = random.randint(0, sys.maxsize)
+    y1 = random.randint(0, sys.maxsize)
+    z1 = random.randint(0, sys.maxsize)
 
 ################################################################################
 

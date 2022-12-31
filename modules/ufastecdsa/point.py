@@ -13,6 +13,10 @@ class CurveMismatchError(Exception):
 
 class Point(object):
     def __init__(self, x, y, curve=P256):
+        if curve != None:
+             x = x % curve.p
+             y = y % curve.p
+
         if not _crypto.ECC.Point(x, y, curve._curve) in curve._curve:
             raise ValueError("not on curve <{}>".format(curve.name))
 
