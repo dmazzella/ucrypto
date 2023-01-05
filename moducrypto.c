@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019-2021 Damiano Mazzella
+ * Copyright (c) 2019-2023 Damiano Mazzella
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,15 +43,39 @@
 
 #include "tomsfastmath/tfm_mpi.h"
 
+#define ERROR_ODD_LEN MP_ERROR_TEXT("odd-length string")
+#define ERROR_NON_HEX MP_ERROR_TEXT("non-hex digit found")
+#define ERROR_ODD_MODULUS MP_ERROR_TEXT("'exptmod' need odd modulus, set 'safe' or use 'fast_pow'")
+#define ERROR_NUM_BITS MP_ERROR_TEXT("number of bits to generate must be in range 16-4096, not %lu bits")
+#define ERROR_PRIME_LEN MP_ERROR_TEXT("Prime is %d, not %lu bits")
+#define ERROR_EXPECTED_INT MP_ERROR_TEXT("expected a int, but %s found")
+#define ERROR_EXPECTED_SIGNATURES MP_ERROR_TEXT("expected two Signature's")
+#define ERROR_EXPECTED_CURVES MP_ERROR_TEXT("expected two Curve's")
+#define ERROR_LEFT_EXPECTED_CURVE MP_ERROR_TEXT("left must be a Curve")
+#define ERROR_RIGHT_EXPECTED_POINT MP_ERROR_TEXT("right must be a Point")
+#define ERROR_EXPECTED_POINT_BUT MP_ERROR_TEXT("expected a Point, but %s found")
+#define ERROR_EXPECTED_STR_BYTES_BUT MP_ERROR_TEXT("expected a str/bytes, but %s found")
+#define ERROR_EXPECTED_POINT_AT_BUT MP_ERROR_TEXT("arg at index %d expected a Point, but %s found")
+#define ERROR_EXPECTED_CURVE_AT_BUT MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found")
+#define ERROR_EXPECTED_INT_AT_BUT MP_ERROR_TEXT("arg at index %d expected a int, but %s found")
+#define ERROR_EXPECTED_SIGNATURE_AT_BUT MP_ERROR_TEXT("arg at index %d expected a Signature, but %s found")
+#define ERROR_EXPECTED_CURVE_BUT MP_ERROR_TEXT("expected a Curve, but %s found")
+#define ERROR_EXPECTED_POINTS MP_ERROR_TEXT("expected two Point's")
+#define ERROR_CURVE_OF_POINTS_NOT_EQUAL MP_ERROR_TEXT("curve of two Point's must be the same")
+#define ERROR_LEFT_EXPECTED_POINT MP_ERROR_TEXT("left must be a Point")
+#define ERROR_RIGHT_EXPECTED_INT MP_ERROR_TEXT("right must be a int")
+
+#define DEFAULT_RADIX 16
+
 STATIC vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
 {
     if ((in_len & 1) != 0)
     {
-        mp_raise_ValueError(MP_ERROR_TEXT("odd-length string"));
+        mp_raise_ValueError(ERROR_ODD_LEN);
     }
 
     vstr_init_len(vstr_out, in_len / 2);
-    byte *out = (byte *)vstr_out->buf;
+    byte *out = (byte *)vstr_str(vstr_out);
     byte hex_byte = 0;
     for (mp_uint_t i = in_len; i--;)
     {
@@ -62,7 +86,7 @@ STATIC vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
         }
         else
         {
-            mp_raise_ValueError(MP_ERROR_TEXT("non-hex digit found"));
+            mp_raise_ValueError(ERROR_NON_HEX);
         }
         if (i & 1)
         {
@@ -118,12 +142,13 @@ STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
     }
 }
 
-STATIC char *mpz_as_str(const mpz_t *i, unsigned int base)
+STATIC vstr_t *mpz_as_str(const mpz_t *i, unsigned int base)
 {
-    vstr_t vstr;
-    vstr_init_len(&vstr, mp_int_format_size(mpz_max_num_bits(i), base, NULL, '\0'));
-    mpz_as_str_inpl(i, base, NULL, 'a', '\0', vstr.buf);
-    return vstr.buf;
+    size_t len = mp_int_format_size(mpz_max_num_bits(i), base, NULL, '\0');
+    vstr_t *vstr = vstr_new(len);
+    mpz_as_str_inpl(i, base, NULL, 'a', '\0', vstr_str(vstr));
+    vstr->len = len;
+    return vstr;
 }
 
 STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
@@ -131,7 +156,9 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
     mpz_t arp_temp;
     fp_init(ft_tmp);
     mpz_t *arp_p = mp_mpz_for_int(arg, &arp_temp);
-    fp_read_radix(ft_tmp, mpz_as_str(arp_p, base), base);
+    vstr_t *vstr = mpz_as_str(arp_p, base);
+    fp_read_radix(ft_tmp, vstr_str(vstr), base);
+    vstr_free(vstr);
     if (arp_p == &arp_temp)
     {
         mpz_deinit(arp_p);
@@ -139,20 +166,22 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp, uint8_t base)
     return true;
 }
 
-STATIC vstr_t vstr_from_fp(const fp_int *fp, int base)
+STATIC vstr_t *vstr_new_from_fp(const fp_int *fp, int base)
 {
-    int size_fp;
-    fp_radix_size((fp_int *)fp, base, &size_fp);
-    vstr_t vstr_fp;
-    vstr_init_len(&vstr_fp, size_fp);
-    fp_toradix_n((fp_int *)fp, vstr_fp.buf, base, size_fp);
+    size_t size_fp;
+    fp_radix_size((fp_int *)fp, base, (int *)&size_fp);
+    vstr_t *vstr_fp = vstr_new(size_fp);
+    vstr_fp->len = size_fp;
+    fp_toradix_n((fp_int *)fp, vstr_str(vstr_fp), base, vstr_len(vstr_fp));
     return vstr_fp;
 }
 
 STATIC mp_obj_t mp_obj_new_int_from_fp(const fp_int *fp, uint8_t base)
 {
-    vstr_t vstr_out = vstr_from_fp((fp_int *)fp, base);
-    return mp_parse_num_integer(vstr_out.buf, vstr_out.len - 1, base, NULL);
+    vstr_t *vstr_out = vstr_new_from_fp((fp_int *)fp, base);
+    mp_obj_t res = mp_parse_num_integer(vstr_str(vstr_out), vstr_len(vstr_out) - 1, base, NULL);
+    vstr_free(vstr_out);
+    return res;
 }
 
 /* returns a TFM ident string useful for debugging... */
@@ -212,7 +241,7 @@ static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
 
 STATIC mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
 {
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
     fp_init(&d_fp_int);
     mp_fp_for_int(A_in, &a_fp_int, base);
@@ -243,7 +272,7 @@ STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t
     } args;
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);
 
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
     fp_init(&d_fp_int);
     mp_fp_for_int(args.a.u_obj, &a_fp_int, base);
@@ -263,7 +292,7 @@ STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t
         }
         else
         {
-            mp_raise_ValueError(MP_ERROR_TEXT("'exptmod' need odd modulus, set 'safe' or use 'fast_pow'"));
+            mp_raise_ValueError(ERROR_ODD_MODULUS);
         }
     }
 
@@ -276,7 +305,7 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_exptmod_obj, MP_ROM_PTR(&mod_
 /* c = 1/a (mod b) */
 STATIC mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
 {
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int, b_fp_int, c_fp_int;
     fp_init(&c_fp_int);
     mp_fp_for_int(A_in, &a_fp_int, base);
@@ -291,7 +320,7 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_invmod_obj, MP_ROM_PTR(&mod_i
 /* c = (a, b) */
 STATIC mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
 {
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int, b_fp_int, c_fp_int;
     fp_init(&c_fp_int);
     mp_fp_for_int(A_in, &a_fp_int, base);
@@ -345,21 +374,21 @@ STATIC mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, m
 
     if (args.num.u_int < 16 || args.num.u_int > 4096)
     {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("number of bits to generate must be in range 16-4096, not %lu bits"), args.num.u_int);
+        mp_raise_msg_varg(&mp_type_ValueError, ERROR_NUM_BITS, args.num.u_int);
     }
     int flags = ((FP_GEN_RANDOM() & 1) ? TFM_PRIME_2MSB_OFF : TFM_PRIME_2MSB_ON);
     if (args.safe.u_bool)
     {
         flags |= TFM_PRIME_SAFE;
     }
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int;
     int ret = FP_OKAY;
     if ((ret = fp_prime_random_ex(&a_fp_int, args.test.u_int, args.num.u_int, flags, ucrypto_rng, NULL)) == FP_OKAY)
     {
         if (fp_count_bits(&a_fp_int) != args.num.u_int)
         {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("Prime is %d, not %lu bits"), fp_count_bits(&a_fp_int), args.num.u_int);
+            mp_raise_msg_varg(&mp_type_ValueError, ERROR_PRIME_LEN, fp_count_bits(&a_fp_int), args.num.u_int);
         }
     }
     else
@@ -386,9 +415,9 @@ STATIC mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);
     if (!MP_OBJ_IS_INT(args.a.u_obj))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s found"), mp_obj_get_type_str(args.a.u_obj));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT, mp_obj_get_type_str(args.a.u_obj));
     }
-    size_t base = 10;
+    size_t base = DEFAULT_RADIX;
     fp_int a_fp_int;
     mp_fp_for_int(args.a.u_obj, &a_fp_int, base);
     int ret = fp_isprime_ex(&a_fp_int, args.test.u_int);
@@ -475,6 +504,47 @@ const mp_obj_type_t curve_type;
 const mp_obj_type_t point_type;
 const mp_obj_type_t ecc_type;
 
+STATIC mp_curve_t *new_curve_init_copy(mp_point_t *point)
+{
+    mp_curve_t *c = m_new_obj(mp_curve_t);
+    c->base.type = &curve_type;
+    c->ecc_curve.radix = point->ecc_curve.radix;
+    c->ecc_curve.g.radix = point->ecc_curve.g.radix;
+    vstr_init(&c->ecc_curve.name, vstr_len(&point->ecc_curve.oid));
+    vstr_add_strn(&c->ecc_curve.name, vstr_str(&point->ecc_curve.name), vstr_len(&point->ecc_curve.name));
+    vstr_init(&c->ecc_curve.oid, vstr_len(&point->ecc_curve.oid));
+    vstr_add_strn(&c->ecc_curve.oid, vstr_str(&point->ecc_curve.oid), vstr_len(&point->ecc_curve.oid));
+    fp_copy(&point->ecc_curve.p, &c->ecc_curve.p);
+    fp_copy(&point->ecc_curve.a, &c->ecc_curve.a);
+    fp_copy(&point->ecc_curve.b, &c->ecc_curve.b);
+    fp_copy(&point->ecc_curve.q, &c->ecc_curve.q);
+    fp_copy(&point->ecc_curve.g.x, &c->ecc_curve.g.x);
+    fp_copy(&point->ecc_curve.g.y, &c->ecc_curve.g.y);
+    return c;
+}
+
+STATIC mp_point_t *new_point_init_copy(mp_curve_t *curve)
+{
+    mp_point_t *pr = m_new_obj(mp_point_t);
+    pr->base.type = &point_type;
+    pr->ecc_point.radix = curve->ecc_curve.radix;
+    pr->ecc_curve.radix = curve->ecc_curve.radix;
+    pr->ecc_curve.g.radix = curve->ecc_curve.g.radix;
+    vstr_init(&pr->ecc_curve.name, vstr_len(&curve->ecc_curve.oid));
+    vstr_add_strn(&pr->ecc_curve.name, vstr_str(&curve->ecc_curve.name), vstr_len(&curve->ecc_curve.name));
+    vstr_init(&pr->ecc_curve.oid, vstr_len(&curve->ecc_curve.oid));
+    vstr_add_strn(&pr->ecc_curve.oid, vstr_str(&curve->ecc_curve.oid), vstr_len(&curve->ecc_curve.oid));
+    fp_copy(&curve->ecc_curve.p, &pr->ecc_curve.p);
+    fp_copy(&curve->ecc_curve.a, &pr->ecc_curve.a);
+    fp_copy(&curve->ecc_curve.b, &pr->ecc_curve.b);
+    fp_copy(&curve->ecc_curve.q, &pr->ecc_curve.q);
+    fp_copy(&curve->ecc_curve.g.x, &pr->ecc_curve.g.x);
+    fp_copy(&curve->ecc_curve.g.y, &pr->ecc_curve.g.y);
+    fp_copy(&curve->ecc_curve.g.x, &pr->ecc_point.x);
+    fp_copy(&curve->ecc_curve.g.y, &pr->ecc_point.y);
+    return pr;
+}
+
 STATIC bool ec_signature_equal(const ecdsa_signature_t *s1, const ecdsa_signature_t *s2)
 {
     if (fp_cmp((fp_int *)&s1->r, (fp_int *)&s2->r) != FP_EQ)
@@ -492,11 +562,11 @@ STATIC void signature_print(const mp_print_t *print, mp_obj_t self_in, mp_print_
 {
     (void)kind;
     mp_ecdsa_signature_t *self = MP_OBJ_TO_PTR(self_in);
-    mp_printf(
-        print,
-        "<Signature r=%s s=%s>",
-        vstr_from_fp((fp_int *)&self->ecdsa_signature.r, self->ecdsa_signature.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecdsa_signature.s, self->ecdsa_signature.radix).buf);
+    vstr_t *vstr_r = vstr_new_from_fp((fp_int *)&self->ecdsa_signature.r, self->ecdsa_signature.radix);
+    vstr_t *vstr_s = vstr_new_from_fp((fp_int *)&self->ecdsa_signature.s, self->ecdsa_signature.radix);
+    mp_printf(print, "<Signature r=%s s=%s>", vstr_str(vstr_r), vstr_str(vstr_s));
+    vstr_free(vstr_r);
+    vstr_free(vstr_s);
 }
 
 STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
@@ -507,7 +577,7 @@ STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rh
     {
         if (!MP_OBJ_IS_TYPE(lhs, &signature_type) && !MP_OBJ_IS_TYPE(rhs, &signature_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("expected two Signature's"));
+            mp_raise_TypeError(ERROR_EXPECTED_SIGNATURES);
         }
         mp_ecdsa_signature_t *l = MP_OBJ_TO_PTR(lhs);
         mp_ecdsa_signature_t *r = MP_OBJ_TO_PTR(rhs);
@@ -640,11 +710,11 @@ STATIC mp_obj_t curve_equal(mp_obj_t curve1, mp_obj_t curve2)
 {
     if (!MP_OBJ_IS_TYPE(curve1, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 1, mp_obj_get_type_str(curve1));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 1, mp_obj_get_type_str(curve1));
     }
     if (!MP_OBJ_IS_TYPE(curve2, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 2, mp_obj_get_type_str(curve2));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 2, mp_obj_get_type_str(curve2));
     }
 
     mp_curve_t *c1 = MP_OBJ_TO_PTR(curve1);
@@ -659,11 +729,11 @@ STATIC mp_obj_t point_in_curve(mp_obj_t point, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 2, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 2, mp_obj_get_type_str(curve));
     }
 
     mp_point_t *p = MP_OBJ_TO_PTR(point);
@@ -680,17 +750,19 @@ STATIC void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     mp_curve_t *self = MP_OBJ_TO_PTR(self_in);
     vstr_t vstr_oid;
     vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
-    mp_printf(
-        print,
-        "<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>",
-        self->ecc_curve.name.buf,
-        vstr_str(&vstr_oid),
-        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix).buf);
+    vstr_t *ecc_curve_p = vstr_new_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix);
+    vstr_t *ecc_curve_a = vstr_new_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix);
+    vstr_t *ecc_curve_b = vstr_new_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix);
+    vstr_t *ecc_curve_q = vstr_new_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix);
+    vstr_t *ecc_curve_g_x = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix);
+    vstr_t *ecc_curve_g_y = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix);
+    mp_printf(print, "<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>", vstr_str(&self->ecc_curve.name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
+    vstr_free(ecc_curve_p);
+    vstr_free(ecc_curve_a);
+    vstr_free(ecc_curve_b);
+    vstr_free(ecc_curve_q);
+    vstr_free(ecc_curve_g_x);
+    vstr_free(ecc_curve_g_y);
 }
 
 STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
@@ -701,7 +773,7 @@ STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     {
         if (!MP_OBJ_IS_TYPE(lhs, &curve_type) && !MP_OBJ_IS_TYPE(rhs, &curve_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("expected two Curve's"));
+            mp_raise_TypeError(ERROR_EXPECTED_CURVES);
         }
         mp_curve_t *l = MP_OBJ_TO_PTR(lhs);
         mp_curve_t *r = MP_OBJ_TO_PTR(rhs);
@@ -711,11 +783,11 @@ STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     {
         if (!MP_OBJ_IS_TYPE(lhs, &curve_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("left must be a Curve"));
+            mp_raise_TypeError(ERROR_LEFT_EXPECTED_CURVE);
         }
         if (!MP_OBJ_IS_TYPE(rhs, &point_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("right must be a Point"));
+            mp_raise_TypeError(ERROR_RIGHT_EXPECTED_POINT);
         }
         mp_curve_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
@@ -758,23 +830,7 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
             }
             else if (attr == MP_QSTR_G)
             {
-                mp_point_t *pr = m_new_obj(mp_point_t);
-                pr->base.type = &point_type;
-                pr->ecc_point.radix = self->ecc_curve.radix;
-                pr->ecc_curve.radix = self->ecc_curve.radix;
-                pr->ecc_curve.g.radix = self->ecc_curve.g.radix;
-                vstr_init(&pr->ecc_curve.name, self->ecc_curve.oid.len);
-                vstr_add_strn(&pr->ecc_curve.name, self->ecc_curve.name.buf, self->ecc_curve.name.len);
-                vstr_init(&pr->ecc_curve.oid, self->ecc_curve.oid.len);
-                vstr_add_strn(&pr->ecc_curve.oid, self->ecc_curve.oid.buf, self->ecc_curve.oid.len);
-                fp_copy(&self->ecc_curve.p, &pr->ecc_curve.p);
-                fp_copy(&self->ecc_curve.a, &pr->ecc_curve.a);
-                fp_copy(&self->ecc_curve.b, &pr->ecc_curve.b);
-                fp_copy(&self->ecc_curve.q, &pr->ecc_curve.q);
-                fp_copy(&self->ecc_curve.g.x, &pr->ecc_curve.g.x);
-                fp_copy(&self->ecc_curve.g.y, &pr->ecc_curve.g.y);
-                fp_copy(&self->ecc_curve.g.x, &pr->ecc_point.x);
-                fp_copy(&self->ecc_curve.g.y, &pr->ecc_point.y);
+                mp_point_t *pr = new_point_init_copy(self);
                 dest[0] = pr;
                 return;
             }
@@ -790,12 +846,12 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
             }
             else if (attr == MP_QSTR_name)
             {
-                dest[0] = mp_obj_new_str_of_type(&mp_type_str, (const byte *)self->ecc_curve.name.buf, self->ecc_curve.name.len);
+                dest[0] = mp_obj_new_str_of_type(&mp_type_str, (const byte *)vstr_str(&self->ecc_curve.name), vstr_len(&self->ecc_curve.name));
                 return;
             }
             else if (attr == MP_QSTR_oid)
             {
-                dest[0] = mp_obj_new_str_of_type(&mp_type_bytes, (const byte *)self->ecc_curve.oid.buf, self->ecc_curve.oid.len);
+                dest[0] = mp_obj_new_str_of_type(&mp_type_bytes, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
                 return;
             }
             mp_convert_member_lookup(obj, type, elem->value, dest);
@@ -805,15 +861,15 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     {
         if ((attr == MP_QSTR_p || attr == MP_QSTR_a || attr == MP_QSTR_b || attr == MP_QSTR_q || attr == MP_QSTR_gx || attr == MP_QSTR_gy) && !MP_OBJ_IS_INT(dest[1]))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s found"), mp_obj_get_type_str(dest[1]));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT, mp_obj_get_type_str(dest[1]));
         }
         else if (attr == MP_QSTR_G && !MP_OBJ_IS_TYPE(dest[1], &point_type))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a Point, but %s found"), mp_obj_get_type_str(dest[1]));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_BUT, mp_obj_get_type_str(dest[1]));
         }
         else if ((attr == MP_QSTR_name || attr == MP_QSTR_oid) && !MP_OBJ_IS_STR_OR_BYTES(dest[1]))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a str/bytes, but %s found"), mp_obj_get_type_str(dest[1]));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_STR_BYTES_BUT, mp_obj_get_type_str(dest[1]));
         }
 
         if (attr == MP_QSTR_p)
@@ -939,7 +995,7 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
     mp_curve_t *curve = m_new_obj(mp_curve_t);
     curve->base.type = &curve_type;
-    curve->ecc_curve.radix = 10;
+    curve->ecc_curve.radix = DEFAULT_RADIX;
     curve->ecc_curve.g.radix = curve->ecc_curve.radix;
     vstr_init(&curve->ecc_curve.name, 0);
     vstr_init(&curve->ecc_curve.oid, 0);
@@ -947,7 +1003,7 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     {
         if (!MP_OBJ_IS_INT(pos_args[i]))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s at index %d found"), mp_obj_get_type_str(pos_args[i]), i);
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, mp_obj_get_type_str(pos_args[i]), i);
         }
     }
 
@@ -962,7 +1018,7 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     {
         if (!MP_OBJ_IS_STR_OR_BYTES(args.name.u_obj))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a str/bytes, but %s found"), mp_obj_get_type_str(args.name.u_obj));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_STR_BYTES_BUT, mp_obj_get_type_str(args.name.u_obj));
         }
         else
         {
@@ -976,7 +1032,7 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     {
         if (!MP_OBJ_IS_STR_OR_BYTES(args.oid.u_obj))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a str/bytes, but %s found"), mp_obj_get_type_str(args.oid.u_obj));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_STR_BYTES_BUT, mp_obj_get_type_str(args.oid.u_obj));
         }
         else
         {
@@ -1335,11 +1391,11 @@ STATIC mp_obj_t point_equal(mp_obj_t point1, mp_obj_t point2)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point1));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point1));
     }
     if (!MP_OBJ_IS_TYPE(point2, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 2, mp_obj_get_type_str(point2));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 2, mp_obj_get_type_str(point2));
     }
 
     mp_point_t *p1 = MP_OBJ_TO_PTR(point1);
@@ -1354,31 +1410,17 @@ STATIC mp_obj_t point_double(mp_obj_t point, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 2, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 2, mp_obj_get_type_str(curve));
     }
 
     mp_point_t *p = MP_OBJ_TO_PTR(point);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
 
-    mp_point_t *pr = m_new_obj(mp_point_t);
-    pr->base.type = &point_type;
-    pr->ecc_point.radix = c->ecc_curve.radix;
-    pr->ecc_curve.radix = c->ecc_curve.radix;
-    pr->ecc_curve.g.radix = c->ecc_curve.g.radix;
-    vstr_init(&pr->ecc_curve.name, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.name, c->ecc_curve.name.buf, c->ecc_curve.name.len);
-    vstr_init(&pr->ecc_curve.oid, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.oid, c->ecc_curve.oid.buf, c->ecc_curve.oid.len);
-    fp_copy(&c->ecc_curve.p, &pr->ecc_curve.p);
-    fp_copy(&c->ecc_curve.a, &pr->ecc_curve.a);
-    fp_copy(&c->ecc_curve.b, &pr->ecc_curve.b);
-    fp_copy(&c->ecc_curve.q, &pr->ecc_curve.q);
-    fp_copy(&c->ecc_curve.g.x, &pr->ecc_curve.g.x);
-    fp_copy(&c->ecc_curve.g.y, &pr->ecc_curve.g.y);
+    mp_point_t *pr = new_point_init_copy(c);
     ec_point_double(&pr->ecc_point, &p->ecc_point, &c->ecc_curve);
     return (mp_obj_t)pr;
 }
@@ -1390,36 +1432,22 @@ STATIC mp_obj_t point_add(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point1));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point1));
     }
     if (!MP_OBJ_IS_TYPE(point2, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 2, mp_obj_get_type_str(point2));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 2, mp_obj_get_type_str(point2));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 3, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 3, mp_obj_get_type_str(curve));
     }
 
     mp_point_t *p1 = MP_OBJ_TO_PTR(point1);
     mp_point_t *p2 = MP_OBJ_TO_PTR(point2);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
 
-    mp_point_t *pr = m_new_obj(mp_point_t);
-    pr->base.type = &point_type;
-    pr->ecc_point.radix = c->ecc_curve.radix;
-    pr->ecc_curve.radix = c->ecc_curve.radix;
-    pr->ecc_curve.g.radix = c->ecc_curve.g.radix;
-    vstr_init(&pr->ecc_curve.name, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.name, c->ecc_curve.name.buf, c->ecc_curve.name.len);
-    vstr_init(&pr->ecc_curve.oid, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.oid, c->ecc_curve.oid.buf, c->ecc_curve.oid.len);
-    fp_copy(&c->ecc_curve.p, &pr->ecc_curve.p);
-    fp_copy(&c->ecc_curve.a, &pr->ecc_curve.a);
-    fp_copy(&c->ecc_curve.b, &pr->ecc_curve.b);
-    fp_copy(&c->ecc_curve.q, &pr->ecc_curve.q);
-    fp_copy(&c->ecc_curve.g.x, &pr->ecc_curve.g.x);
-    fp_copy(&c->ecc_curve.g.y, &pr->ecc_curve.g.y);
+    mp_point_t *pr = new_point_init_copy(c);
     ec_point_add(&pr->ecc_point, &p1->ecc_point, &p2->ecc_point, &c->ecc_curve);
     return (mp_obj_t)pr;
 }
@@ -1431,15 +1459,15 @@ STATIC mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point1));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point1));
     }
     if (!MP_OBJ_IS_TYPE(point2, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 2, mp_obj_get_type_str(point2));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 2, mp_obj_get_type_str(point2));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 3, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 3, mp_obj_get_type_str(curve));
     }
 
     mp_point_t *p1 = MP_OBJ_TO_PTR(point1);
@@ -1452,21 +1480,7 @@ STATIC mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
     fp_neg((fp_int *)&p2->ecc_point.y, (fp_int *)&p2->ecc_point.y);
     fp_mod((fp_int *)&p2->ecc_point.y, (fp_int *)&c->ecc_curve.p, (fp_int *)&p2->ecc_point.y);
 
-    mp_point_t *pr = m_new_obj(mp_point_t);
-    pr->base.type = &point_type;
-    pr->ecc_point.radix = c->ecc_curve.radix;
-    pr->ecc_curve.radix = c->ecc_curve.radix;
-    pr->ecc_curve.g.radix = c->ecc_curve.g.radix;
-    vstr_init(&pr->ecc_curve.name, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.name, c->ecc_curve.name.buf, c->ecc_curve.name.len);
-    vstr_init(&pr->ecc_curve.oid, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.oid, c->ecc_curve.oid.buf, c->ecc_curve.oid.len);
-    fp_copy(&c->ecc_curve.p, &pr->ecc_curve.p);
-    fp_copy(&c->ecc_curve.a, &pr->ecc_curve.a);
-    fp_copy(&c->ecc_curve.b, &pr->ecc_curve.b);
-    fp_copy(&c->ecc_curve.q, &pr->ecc_curve.q);
-    fp_copy(&c->ecc_curve.g.x, &pr->ecc_curve.g.x);
-    fp_copy(&c->ecc_curve.g.y, &pr->ecc_curve.g.y);
+    mp_point_t *pr = new_point_init_copy(c);
     ec_point_add(&pr->ecc_point, &p1->ecc_point, &p2->ecc_point, &c->ecc_curve);
 
     // restore point.y
@@ -1481,15 +1495,15 @@ STATIC mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 1, mp_obj_get_type_str(point));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 1, mp_obj_get_type_str(point));
     }
     if (!MP_OBJ_IS_INT(scalar))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a int, but %s found"), 2, mp_obj_get_type_str(scalar));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, 2, mp_obj_get_type_str(scalar));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 3, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 3, mp_obj_get_type_str(curve));
     }
 
     mp_point_t *p = MP_OBJ_TO_PTR(point);
@@ -1497,21 +1511,7 @@ STATIC mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
     fp_int s_fp_int;
     mp_fp_for_int(scalar, &s_fp_int, p->ecc_point.radix);
 
-    mp_point_t *pr = m_new_obj(mp_point_t);
-    pr->base.type = &point_type;
-    pr->ecc_point.radix = c->ecc_curve.radix;
-    pr->ecc_curve.radix = c->ecc_curve.radix;
-    pr->ecc_curve.g.radix = c->ecc_curve.g.radix;
-    vstr_init(&pr->ecc_curve.name, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.name, c->ecc_curve.name.buf, c->ecc_curve.name.len);
-    vstr_init(&pr->ecc_curve.oid, c->ecc_curve.oid.len);
-    vstr_add_strn(&pr->ecc_curve.oid, c->ecc_curve.oid.buf, c->ecc_curve.oid.len);
-    fp_copy(&c->ecc_curve.p, &pr->ecc_curve.p);
-    fp_copy(&c->ecc_curve.a, &pr->ecc_curve.a);
-    fp_copy(&c->ecc_curve.b, &pr->ecc_curve.b);
-    fp_copy(&c->ecc_curve.q, &pr->ecc_curve.q);
-    fp_copy(&c->ecc_curve.g.x, &pr->ecc_curve.g.x);
-    fp_copy(&c->ecc_curve.g.y, &pr->ecc_curve.g.y);
+    mp_point_t *pr = new_point_init_copy(c);
     ec_point_mul(&pr->ecc_point, &p->ecc_point, s_fp_int, &c->ecc_curve);
     return (mp_obj_t)pr;
 }
@@ -1533,12 +1533,12 @@ STATIC mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *
 
     mp_ecdsa_signature_t *signature = m_new_obj(mp_ecdsa_signature_t);
     signature->base.type = &signature_type;
-    signature->ecdsa_signature.radix = 10;
+    signature->ecdsa_signature.radix = DEFAULT_RADIX;
     for (size_t i = 0; i < n_args; i++)
     {
         if (!MP_OBJ_IS_INT(pos_args[i]))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s at index %d found"), mp_obj_get_type_str(pos_args[i]), i);
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, mp_obj_get_type_str(pos_args[i]), i);
         }
     }
 
@@ -1563,15 +1563,15 @@ STATIC mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
     mp_get_buffer_raise(msg, &bufinfo, MP_BUFFER_READ);
     if (!MP_OBJ_IS_INT(d))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a int, but %s found"), 2, mp_obj_get_type_str(d));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, 2, mp_obj_get_type_str(d));
     }
     if (!MP_OBJ_IS_INT(k))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a int, but %s found"), 3, mp_obj_get_type_str(k));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, 3, mp_obj_get_type_str(k));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 4, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 4, mp_obj_get_type_str(curve));
     }
 
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
@@ -1600,17 +1600,17 @@ STATIC mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
 
     if (!MP_OBJ_IS_TYPE(signature, &signature_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Signature, but %s found"), 1, mp_obj_get_type_str(signature));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_SIGNATURE_AT_BUT, 1, mp_obj_get_type_str(signature));
     }
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(msg, &bufinfo, MP_BUFFER_READ);
     if (!MP_OBJ_IS_TYPE(Q, &point_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Point, but %s found"), 3, mp_obj_get_type_str(Q));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_POINT_AT_BUT, 3, mp_obj_get_type_str(Q));
     }
     if (!MP_OBJ_IS_TYPE(curve, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("arg at index %d expected a Curve, but %s found"), 4, mp_obj_get_type_str(curve));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_AT_BUT, 4, mp_obj_get_type_str(curve));
     }
 
     mp_ecdsa_signature_t *s = MP_OBJ_TO_PTR(signature);
@@ -1628,19 +1628,23 @@ STATIC void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     mp_point_t *self = MP_OBJ_TO_PTR(self_in);
     vstr_t vstr_oid;
     vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
-    mp_printf(
-        print,
-        "<Point x=%s y=%s curve=<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>>",
-        vstr_from_fp((fp_int *)&self->ecc_point.x, self->ecc_point.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_point.y, self->ecc_point.radix).buf,
-        self->ecc_curve.name.buf,
-        vstr_str(&vstr_oid),
-        vstr_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix).buf,
-        vstr_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix).buf);
+    vstr_t *ecc_point_x = vstr_new_from_fp((fp_int *)&self->ecc_point.x, self->ecc_point.radix);
+    vstr_t *ecc_point_y = vstr_new_from_fp((fp_int *)&self->ecc_point.y, self->ecc_point.radix);
+    vstr_t *ecc_curve_p = vstr_new_from_fp((fp_int *)&self->ecc_curve.p, self->ecc_curve.radix);
+    vstr_t *ecc_curve_a = vstr_new_from_fp((fp_int *)&self->ecc_curve.a, self->ecc_curve.radix);
+    vstr_t *ecc_curve_b = vstr_new_from_fp((fp_int *)&self->ecc_curve.b, self->ecc_curve.radix);
+    vstr_t *ecc_curve_q = vstr_new_from_fp((fp_int *)&self->ecc_curve.q, self->ecc_curve.radix);
+    vstr_t *ecc_curve_g_x = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.x, self->ecc_curve.g.radix);
+    vstr_t *ecc_curve_g_y = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.y, self->ecc_curve.g.radix);
+    mp_printf(print, "<Point x=%s y=%s curve=<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>>", vstr_str(ecc_point_x), vstr_str(ecc_point_y), vstr_str(&self->ecc_curve.name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
+    vstr_free(ecc_point_x);
+    vstr_free(ecc_point_y);
+    vstr_free(ecc_curve_p);
+    vstr_free(ecc_curve_a);
+    vstr_free(ecc_curve_b);
+    vstr_free(ecc_curve_q);
+    vstr_free(ecc_curve_g_x);
+    vstr_free(ecc_curve_g_y);
 }
 
 STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
@@ -1665,21 +1669,7 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
             }
             else if (attr == MP_QSTR_curve)
             {
-                mp_curve_t *c = m_new_obj(mp_curve_t);
-                c->base.type = &curve_type;
-                c->ecc_curve.radix = self->ecc_curve.radix;
-                c->ecc_curve.g.radix = self->ecc_curve.g.radix;
-                vstr_init(&c->ecc_curve.name, self->ecc_curve.oid.len);
-                vstr_add_strn(&c->ecc_curve.name, self->ecc_curve.name.buf, self->ecc_curve.name.len);
-                vstr_init(&c->ecc_curve.oid, self->ecc_curve.oid.len);
-                vstr_add_strn(&c->ecc_curve.oid, self->ecc_curve.oid.buf, self->ecc_curve.oid.len);
-                fp_copy(&self->ecc_curve.p, &c->ecc_curve.p);
-                fp_copy(&self->ecc_curve.a, &c->ecc_curve.a);
-                fp_copy(&self->ecc_curve.b, &c->ecc_curve.b);
-                fp_copy(&self->ecc_curve.q, &c->ecc_curve.q);
-                fp_copy(&self->ecc_curve.g.x, &c->ecc_curve.g.x);
-                fp_copy(&self->ecc_curve.g.y, &c->ecc_curve.g.y);
-                dest[0] = c;
+                dest[0] = new_curve_init_copy(self);
                 return;
             }
             mp_convert_member_lookup(obj, type, elem->value, dest);
@@ -1689,11 +1679,11 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     {
         if ((attr == MP_QSTR_x || attr == MP_QSTR_y) && !MP_OBJ_IS_INT(dest[1]))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s found"), mp_obj_get_type_str(dest[1]));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT, mp_obj_get_type_str(dest[1]));
         }
         else if (attr == MP_QSTR_curve && !MP_OBJ_IS_TYPE(dest[1], &curve_type))
         {
-            mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a Curve, but %s found"), mp_obj_get_type_str(dest[1]));
+            mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_BUT, mp_obj_get_type_str(dest[1]));
         }
 
         if (attr == MP_QSTR_x)
@@ -1709,10 +1699,10 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
             mp_curve_t *other = MP_OBJ_TO_PTR(dest[1]);
             self->ecc_curve.radix = other->ecc_curve.radix;
             self->ecc_curve.g.radix = other->ecc_curve.g.radix;
-            vstr_init(&self->ecc_curve.name, other->ecc_curve.oid.len);
-            vstr_add_strn(&self->ecc_curve.name, other->ecc_curve.name.buf, other->ecc_curve.name.len);
-            vstr_init(&self->ecc_curve.oid, other->ecc_curve.oid.len);
-            vstr_add_strn(&self->ecc_curve.oid, other->ecc_curve.oid.buf, other->ecc_curve.oid.len);
+            vstr_init(&self->ecc_curve.name, vstr_len(&other->ecc_curve.oid));
+            vstr_add_strn(&self->ecc_curve.name, vstr_str(&other->ecc_curve.name), vstr_len(&other->ecc_curve.name));
+            vstr_init(&self->ecc_curve.oid, vstr_len(&other->ecc_curve.oid));
+            vstr_add_strn(&self->ecc_curve.oid, vstr_str(&other->ecc_curve.oid), vstr_len(&other->ecc_curve.oid));
             fp_copy(&other->ecc_curve.p, &self->ecc_curve.p);
             fp_copy(&other->ecc_curve.a, &self->ecc_curve.a);
             fp_copy(&other->ecc_curve.b, &self->ecc_curve.b);
@@ -1736,60 +1726,32 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     {
         if (!MP_OBJ_IS_TYPE(lhs, &point_type) && !MP_OBJ_IS_TYPE(rhs, &point_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("expected two Point's"));
+            mp_raise_TypeError(ERROR_EXPECTED_POINTS);
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
         if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
         {
-            mp_raise_ValueError(MP_ERROR_TEXT("curve of two Point's must be the same"));
+            mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
 
-        mp_curve_t *c = m_new_obj(mp_curve_t);
-        c->base.type = &curve_type;
-        c->ecc_curve.radix = l->ecc_curve.radix;
-        c->ecc_curve.g.radix = l->ecc_curve.g.radix;
-        vstr_init(&c->ecc_curve.name, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.name, l->ecc_curve.name.buf, l->ecc_curve.name.len);
-        vstr_init(&c->ecc_curve.oid, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.oid, l->ecc_curve.oid.buf, l->ecc_curve.oid.len);
-        fp_copy(&l->ecc_curve.p, &c->ecc_curve.p);
-        fp_copy(&l->ecc_curve.a, &c->ecc_curve.a);
-        fp_copy(&l->ecc_curve.b, &c->ecc_curve.b);
-        fp_copy(&l->ecc_curve.q, &c->ecc_curve.q);
-        fp_copy(&l->ecc_curve.g.x, &c->ecc_curve.g.x);
-        fp_copy(&l->ecc_curve.g.y, &c->ecc_curve.g.y);
-
+        mp_curve_t *c = new_curve_init_copy(l);
         return point_add((mp_obj_t)l, (mp_obj_t)r, (mp_obj_t)c);
     }
     case MP_BINARY_OP_SUBTRACT:
     {
         if (!MP_OBJ_IS_TYPE(lhs, &point_type) && !MP_OBJ_IS_TYPE(rhs, &point_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("expected two Point's"));
+            mp_raise_TypeError(ERROR_EXPECTED_POINTS);
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
         if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
         {
-            mp_raise_ValueError(MP_ERROR_TEXT("curve of two Point's must be the same"));
+            mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
 
-        mp_curve_t *c = m_new_obj(mp_curve_t);
-        c->base.type = &curve_type;
-        c->ecc_curve.radix = l->ecc_curve.radix;
-        c->ecc_curve.g.radix = l->ecc_curve.g.radix;
-        vstr_init(&c->ecc_curve.name, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.name, l->ecc_curve.name.buf, l->ecc_curve.name.len);
-        vstr_init(&c->ecc_curve.oid, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.oid, l->ecc_curve.oid.buf, l->ecc_curve.oid.len);
-        fp_copy(&l->ecc_curve.p, &c->ecc_curve.p);
-        fp_copy(&l->ecc_curve.a, &c->ecc_curve.a);
-        fp_copy(&l->ecc_curve.b, &c->ecc_curve.b);
-        fp_copy(&l->ecc_curve.q, &c->ecc_curve.q);
-        fp_copy(&l->ecc_curve.g.x, &c->ecc_curve.g.x);
-        fp_copy(&l->ecc_curve.g.y, &c->ecc_curve.g.y);
-
+        mp_curve_t *c = new_curve_init_copy(l);
         return point_sub((mp_obj_t)l, (mp_obj_t)r, (mp_obj_t)c);
     }
     case MP_BINARY_OP_MULTIPLY:
@@ -1799,41 +1761,27 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     {
         if (!MP_OBJ_IS_TYPE(lhs, &point_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("left must be a Point"));
+            mp_raise_TypeError(ERROR_LEFT_EXPECTED_POINT);
         }
         if (!MP_OBJ_IS_INT(rhs))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("right must be a int"));
+            mp_raise_TypeError(ERROR_RIGHT_EXPECTED_INT);
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
-        mp_curve_t *c = m_new_obj(mp_curve_t);
-        c->base.type = &curve_type;
-        c->ecc_curve.radix = l->ecc_curve.radix;
-        c->ecc_curve.g.radix = l->ecc_curve.g.radix;
-        vstr_init(&c->ecc_curve.name, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.name, l->ecc_curve.name.buf, l->ecc_curve.name.len);
-        vstr_init(&c->ecc_curve.oid, l->ecc_curve.oid.len);
-        vstr_add_strn(&c->ecc_curve.oid, l->ecc_curve.oid.buf, l->ecc_curve.oid.len);
-        fp_copy(&l->ecc_curve.p, &c->ecc_curve.p);
-        fp_copy(&l->ecc_curve.a, &c->ecc_curve.a);
-        fp_copy(&l->ecc_curve.b, &c->ecc_curve.b);
-        fp_copy(&l->ecc_curve.q, &c->ecc_curve.q);
-        fp_copy(&l->ecc_curve.g.x, &c->ecc_curve.g.x);
-        fp_copy(&l->ecc_curve.g.y, &c->ecc_curve.g.y);
-
+        mp_curve_t *c = new_curve_init_copy(l);
         return point_mul((mp_obj_t)l, rhs, (mp_obj_t)c);
     }
     case MP_BINARY_OP_EQUAL:
     {
         if (!MP_OBJ_IS_TYPE(lhs, &point_type) && !MP_OBJ_IS_TYPE(rhs, &point_type))
         {
-            mp_raise_TypeError(MP_ERROR_TEXT("expected two Point's"));
+            mp_raise_TypeError(ERROR_EXPECTED_POINTS);
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
         if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
         {
-            mp_raise_ValueError(MP_ERROR_TEXT("curve of two Point's must be the same"));
+            mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
         return point_equal((mp_obj_t)l, (mp_obj_t)r);
     }
@@ -1857,23 +1805,7 @@ STATIC mp_obj_t point_unary_op(mp_unary_op_t op, mp_obj_t self_in)
         fp_neg((fp_int *)&point->ecc_point.y, (fp_int *)&point->ecc_point.y);
         fp_mod((fp_int *)&point->ecc_point.y, (fp_int *)&point->ecc_curve.p, (fp_int *)&point->ecc_point.y);
 
-        mp_point_t *pr = m_new_obj(mp_point_t);
-        pr->base.type = &point_type;
-        pr->ecc_point.radix = point->ecc_point.radix;
-        pr->ecc_curve.radix = point->ecc_curve.radix;
-        pr->ecc_curve.g.radix = point->ecc_curve.g.radix;
-        vstr_init(&pr->ecc_curve.name, point->ecc_curve.oid.len);
-        vstr_add_strn(&pr->ecc_curve.name, point->ecc_curve.name.buf, point->ecc_curve.name.len);
-        vstr_init(&pr->ecc_curve.oid, point->ecc_curve.oid.len);
-        vstr_add_strn(&pr->ecc_curve.oid, point->ecc_curve.oid.buf, point->ecc_curve.oid.len);
-        fp_copy(&point->ecc_point.x, &pr->ecc_point.x);
-        fp_copy(&point->ecc_point.y, &pr->ecc_point.y);
-        fp_copy(&point->ecc_curve.p, &pr->ecc_curve.p);
-        fp_copy(&point->ecc_curve.a, &pr->ecc_curve.a);
-        fp_copy(&point->ecc_curve.b, &pr->ecc_curve.b);
-        fp_copy(&point->ecc_curve.q, &pr->ecc_curve.q);
-        fp_copy(&point->ecc_curve.g.x, &pr->ecc_curve.g.x);
-        fp_copy(&point->ecc_curve.g.y, &pr->ecc_curve.g.y);
+        mp_point_t *pr = new_point_init_copy((mp_curve_t *)point);
 
         // restore point.y
         fp_copy(&point_y_fp_int, (fp_int *)&point->ecc_point.y);
@@ -1919,11 +1851,11 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
     mp_point_t *point = m_new_obj(mp_point_t);
     point->base.type = &point_type;
-    point->ecc_point.radix = 10;
+    point->ecc_point.radix = DEFAULT_RADIX;
 
     if (!MP_OBJ_IS_INT(args.x.u_obj))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s at index %d found"), mp_obj_get_type_str(args.x.u_obj), 1);
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, mp_obj_get_type_str(args.x.u_obj), 1);
     }
     else
     {
@@ -1932,7 +1864,7 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
     if (!MP_OBJ_IS_INT(args.y.u_obj))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a int, but %s at index %d found"), mp_obj_get_type_str(args.y.u_obj), 2);
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, mp_obj_get_type_str(args.y.u_obj), 2);
     }
     else
     {
@@ -1941,17 +1873,17 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
     if (!MP_OBJ_IS_TYPE(args.curve.u_obj, &curve_type))
     {
-        mp_raise_msg_varg(&mp_type_TypeError, MP_ERROR_TEXT("expected a Curve, but %s at 'curve' parameter"), mp_obj_get_type_str(args.curve.u_obj));
+        mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_CURVE_BUT, mp_obj_get_type_str(args.curve.u_obj));
     }
     else
     {
         mp_curve_t *curve = MP_OBJ_TO_PTR(args.curve.u_obj);
         point->ecc_curve.radix = curve->ecc_curve.radix;
         point->ecc_curve.g.radix = curve->ecc_curve.g.radix;
-        vstr_init(&point->ecc_curve.name, curve->ecc_curve.oid.len);
-        vstr_add_strn(&point->ecc_curve.name, curve->ecc_curve.name.buf, curve->ecc_curve.name.len);
-        vstr_init(&point->ecc_curve.oid, curve->ecc_curve.oid.len);
-        vstr_add_strn(&point->ecc_curve.oid, curve->ecc_curve.oid.buf, curve->ecc_curve.oid.len);
+        vstr_init(&point->ecc_curve.name, vstr_len(&curve->ecc_curve.oid));
+        vstr_add_strn(&point->ecc_curve.name, vstr_str(&curve->ecc_curve.name), vstr_len(&curve->ecc_curve.name));
+        vstr_init(&point->ecc_curve.oid, vstr_len(&curve->ecc_curve.oid));
+        vstr_add_strn(&point->ecc_curve.oid, vstr_str(&curve->ecc_curve.oid), vstr_len(&curve->ecc_curve.oid));
         fp_copy(&curve->ecc_curve.p, &point->ecc_curve.p);
         fp_copy(&curve->ecc_curve.a, &point->ecc_curve.a);
         fp_copy(&curve->ecc_curve.b, &point->ecc_curve.b);

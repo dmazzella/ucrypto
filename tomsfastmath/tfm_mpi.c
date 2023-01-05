@@ -1,7 +1,7 @@
 /*
  *
  * Porting to Micropython
- * Copyright (c) 2016-2019 Damiano Mazzella
+ * Copyright (c) 2016-2023 Damiano Mazzella
  *
 */
 
