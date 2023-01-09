@@ -425,6 +425,7 @@ typedef struct
 } fp_int;
 
 /* functions */
+char fp_to_upper(char str);
 
 /* returns a TFM ident string useful for debugging... */
 const char *fp_ident(void);

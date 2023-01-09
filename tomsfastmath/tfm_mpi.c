@@ -329,7 +329,7 @@ int fp_radix_size(fp_int *a, int radix, int *size)
  * Tom St Denis, tomstdenis@gmail.com
  */
 
-static char to_upper(char str)
+char fp_to_upper(char str)
 {
   return ((str >= 'a' && str <= 'z') ? (str - 32) : str);
 }
@@ -368,7 +368,7 @@ int fp_read_radix(fp_int *a, const char *str, int radix)
      * this allows numbers like 1AB and 1ab to represent the same  value
      * [e.g. in hex]
      */
-    ch = (char)((radix <= 36) ? to_upper(*str) : *str);
+    ch = (char)((radix <= 36) ? fp_to_upper(*str) : *str);
     for (y = 0; y < 64; y++)
     {
       if (ch == fp_s_rmap[y])
