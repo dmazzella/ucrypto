@@ -138,12 +138,7 @@ STATIC mp_obj_t fp_int_as_int(fp_int *b)
     }
 
     size_t nbits = fp_count_bits(b);
-    size_t quo = (nbits / 8);
-    size_t rem = (nbits % 8);
-    if (rem != 0)
-    {
-        quo += 1;
-    }
+    size_t bsize = (nbits >> 3) + (nbits & 7 ? 1 : 0);
 
     bool is_neg = false;
     if (fp_cmp_d(b, 0) == FP_LT)
@@ -156,15 +151,15 @@ STATIC mp_obj_t fp_int_as_int(fp_int *b)
         fp_abs(b, b);
     }
 
-    byte *bb = m_new(byte, quo);
+    byte *bb = m_new(byte, bsize);
     if (bb == NULL)
     {
-        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)quo);
+        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)bsize);
     }
 
     fp_to_unsigned_bin(b, bb);
 
-    mpz_set_from_bytes(&o->mpz, true, quo, bb);
+    mpz_set_from_bytes(&o->mpz, true, bsize, bb);
 
     m_free(bb);
 
@@ -190,17 +185,12 @@ STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
     }
 
     size_t nbits = mpz_max_num_bits(i);
-    size_t quo = (nbits / 8);
-    size_t rem = (nbits % 8);
-    if (rem != 0)
-    {
-        quo += 1;
-    }
+    size_t bsize = (nbits >> 3) + (nbits & 7 ? 1 : 0);
 
-    byte *ib = m_new(byte, quo);
+    byte *ib = m_new(byte, bsize);
     if (ib == NULL)
     {
-        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)quo);
+        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)bsize);
     }
 
     bool is_neg = mpz_is_neg(i);
@@ -209,14 +199,14 @@ STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
         mpz_abs_inpl(i, i);
     }
 
-    mpz_as_bytes(i, true, quo, ib);
+    mpz_as_bytes(i, true, bsize, ib);
 
     if (is_neg)
     {
         mpz_neg_inpl(i, i);
     }
 
-    fp_read_unsigned_bin(b, ib, quo);
+    fp_read_unsigned_bin(b, ib, bsize);
 
     m_free(ib);
 
@@ -250,17 +240,6 @@ STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
     }
 }
 
-#if 0
-STATIC vstr_t *mpz_as_str(const mpz_t *i, unsigned int base)
-{
-    size_t len = mp_int_format_size(mpz_max_num_bits(i), base, NULL, '\0');
-    vstr_t *vstr = vstr_new(len);
-    mpz_as_str_inpl(i, base, NULL, 'a', '\0', vstr_str(vstr));
-    vstr->len = len;
-    return vstr;
-}
-#endif
-
 STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
 {
     mpz_t arp_temp;
@@ -273,6 +252,17 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
     }
     return true;
 }
+
+#if 0
+STATIC vstr_t *vstr_new_from_mpz(const mpz_t *i)
+{
+    size_t len = mp_int_format_size(mpz_max_num_bits(i), 10, NULL, '\0');
+    vstr_t *vstr = vstr_new(len);
+    mpz_as_str_inpl(i, 10, NULL, 'a', '\0', vstr_str(vstr));
+    vstr->len = len;
+    return vstr;
+}
+#endif
 
 STATIC vstr_t *vstr_new_from_fp(const fp_int *fp)
 {
