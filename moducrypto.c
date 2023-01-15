@@ -127,6 +127,21 @@ STATIC vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
     return vstr_out;
 }
 
+STATIC fp_int *fp_alloc(void)
+{
+    fp_int *a = m_new_obj(fp_int);
+    fp_init(a);
+    return a;
+}
+
+STATIC void fp_free(fp_int *a)
+{
+    if (a != NULL)
+    {
+        m_del_obj(fp_int, a);
+    }
+}
+
 STATIC mp_obj_t fp_int_as_int(fp_int *b)
 {
     mp_obj_int_t *o = mp_obj_int_new_mpz();
@@ -152,16 +167,12 @@ STATIC mp_obj_t fp_int_as_int(fp_int *b)
     }
 
     byte *bb = m_new(byte, bsize);
-    if (bb == NULL)
-    {
-        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)bsize);
-    }
 
     fp_to_unsigned_bin(b, bb);
 
     mpz_set_from_bytes(&o->mpz, true, bsize, bb);
 
-    m_free(bb);
+    m_del(byte, bb, bsize);
 
     if (!mpz_is_zero(&o->mpz))
     {
@@ -188,10 +199,6 @@ STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
     size_t bsize = (nbits >> 3) + (nbits & 7 ? 1 : 0);
 
     byte *ib = m_new(byte, bsize);
-    if (ib == NULL)
-    {
-        mp_raise_msg_varg(&mp_type_MemoryError, ERROR_MEMORY, (uint)bsize);
-    }
 
     bool is_neg = mpz_is_neg(i);
     if (is_neg)
@@ -208,7 +215,7 @@ STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
 
     fp_read_unsigned_bin(b, ib, bsize);
 
-    m_free(ib);
+    m_del(byte, ib, bsize);
 
     /* set the sign only if b != 0 */
     if (fp_iszero(b) != FP_YES)
@@ -243,7 +250,6 @@ STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
 STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
 {
     mpz_t arp_temp;
-    fp_init(ft_tmp);
     mpz_t *arp_p = mp_mpz_for_int(arg, &arp_temp);
     mpz_as_fp_int(arp_p, ft_tmp);
     if (arp_p == &arp_temp)
@@ -264,13 +270,13 @@ STATIC vstr_t *vstr_new_from_mpz(const mpz_t *i)
 }
 #endif
 
-STATIC vstr_t *vstr_new_from_fp(const fp_int *fp)
+STATIC vstr_t *vstr_new_from_fp(fp_int *fp)
 {
-    size_t size_fp;
-    fp_radix_size((fp_int *)fp, 10, (int *)&size_fp);
+    int size_fp;
+    fp_radix_size(fp, 10, &size_fp);
     vstr_t *vstr_fp = vstr_new(size_fp);
     vstr_fp->len = size_fp;
-    fp_toradix_n((fp_int *)fp, vstr_str(vstr_fp), 10, vstr_len(vstr_fp));
+    fp_toradix_n(fp, vstr_str(vstr_fp), 10, vstr_len(vstr_fp));
     return vstr_fp;
 }
 
@@ -295,56 +301,66 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_ident_obj, MP_ROM_PTR(&mod_id
 
 static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
 {
-    fp_int x;
-    fp_int e;
-    fp_int y;
+    fp_int *x = fp_alloc();
+    fp_int *e = fp_alloc();
+    fp_int *y = fp_alloc();
 
-    fp_init(&x);
-    fp_init(&e);
-    fp_init(&y);
-
-    fp_copy(X, &x);
-    fp_copy(E, &e);
-    fp_set(&y, 1);
+    fp_copy(X, x);
+    fp_copy(E, e);
+    fp_set(y, 1);
 
     // while E > 0:
-    while (fp_cmp_d(&e, 0) == FP_GT)
+    while (fp_cmp_d(e, 0) == FP_GT)
     {
         // if E % 2 == 0:
         fp_digit Emod2;
-        fp_mod_d(&e, 2, &Emod2);
+        fp_mod_d(e, 2, &Emod2);
         if (Emod2 == 0)
         {
             // X = (X * X) % m
-            fp_sqrmod(&x, M, &x);
+            fp_sqrmod(x, M, x);
             // E = E / 2
-            fp_div_2(&e, &e);
+            fp_div_2(e, e);
         }
         else
         {
             // Y = (X * Y) % m
-            fp_mulmod(&x, &y, M, &y);
+            fp_mulmod(x, y, M, y);
             // E = E - 1
-            fp_sub_d(&e, 1, &e);
+            fp_sub_d(e, 1, e);
         }
     }
 
-    fp_copy(&y, Y);
+    fp_copy(y, Y);
+
+    fp_free(x);
+    fp_free(e);
+    fp_free(y);
 
     return FP_OKAY;
 }
 
 STATIC mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
 {
-    fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
-    fp_init(&d_fp_int);
-    mp_fp_for_int(A_in, &a_fp_int);
-    mp_fp_for_int(B_in, &b_fp_int);
-    mp_fp_for_int(C_in, &c_fp_int);
+    fp_int *a_fp_int = fp_alloc();
+    fp_int *b_fp_int = fp_alloc();
+    fp_int *c_fp_int = fp_alloc();
+    fp_int *d_fp_int = fp_alloc();
 
-    fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+    mp_fp_for_int(A_in, a_fp_int);
+    mp_fp_for_int(B_in, b_fp_int);
+    mp_fp_for_int(C_in, c_fp_int);
 
-    return mp_obj_new_int_from_fp(&d_fp_int);
+    fp_pow3(a_fp_int, b_fp_int, c_fp_int, d_fp_int);
+
+    mp_obj_t res = mp_obj_new_int_from_fp(d_fp_int);
+
+    fp_free(d_fp_int);
+    fp_free(a_fp_int);
+    fp_free(b_fp_int);
+    fp_free(c_fp_int);
+
+    return res;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_fast_pow_obj, mod_fast_pow);
@@ -366,22 +382,25 @@ STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t
     } args;
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);
 
-    fp_int a_fp_int, b_fp_int, c_fp_int, d_fp_int;
-    fp_init(&d_fp_int);
-    mp_fp_for_int(args.a.u_obj, &a_fp_int);
-    mp_fp_for_int(args.b.u_obj, &b_fp_int);
-    mp_fp_for_int(args.c.u_obj, &c_fp_int);
+    fp_int *a_fp_int = fp_alloc();
+    fp_int *b_fp_int = fp_alloc();
+    fp_int *c_fp_int = fp_alloc();
+    fp_int *d_fp_int = fp_alloc();
+
+    mp_fp_for_int(args.a.u_obj, a_fp_int);
+    mp_fp_for_int(args.b.u_obj, b_fp_int);
+    mp_fp_for_int(args.c.u_obj, c_fp_int);
 
     // the montgomery reduce need odd modulus
-    if (fp_isodd(&c_fp_int) == FP_YES)
+    if (fp_isodd(c_fp_int) == FP_YES)
     {
-        fp_exptmod(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+        fp_exptmod(a_fp_int, b_fp_int, c_fp_int, d_fp_int);
     }
     else
     {
         if (args.safe.u_bool)
         {
-            fp_pow3(&a_fp_int, &b_fp_int, &c_fp_int, &d_fp_int);
+            fp_pow3(a_fp_int, b_fp_int, c_fp_int, d_fp_int);
         }
         else
         {
@@ -389,7 +408,14 @@ STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t
         }
     }
 
-    return mp_obj_new_int_from_fp(&d_fp_int);
+    mp_obj_t res = mp_obj_new_int_from_fp(d_fp_int);
+
+    fp_free(d_fp_int);
+    fp_free(a_fp_int);
+    fp_free(b_fp_int);
+    fp_free(c_fp_int);
+
+    return res;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_exptmod_obj, 3, mod_exptmod);
@@ -398,12 +424,21 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_exptmod_obj, MP_ROM_PTR(&mod_
 /* c = 1/a (mod b) */
 STATIC mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
 {
-    fp_int a_fp_int, b_fp_int, c_fp_int;
-    fp_init(&c_fp_int);
-    mp_fp_for_int(A_in, &a_fp_int);
-    mp_fp_for_int(B_in, &b_fp_int);
-    fp_invmod(&a_fp_int, &b_fp_int, &c_fp_int);
-    return mp_obj_new_int_from_fp(&c_fp_int);
+    fp_int *a_fp_int = fp_alloc();
+    fp_int *b_fp_int = fp_alloc();
+    fp_int *c_fp_int = fp_alloc();
+
+    mp_fp_for_int(A_in, a_fp_int);
+    mp_fp_for_int(B_in, b_fp_int);
+
+    fp_invmod(a_fp_int, b_fp_int, c_fp_int);
+    mp_obj_t res = mp_obj_new_int_from_fp(c_fp_int);
+
+    fp_free(a_fp_int);
+    fp_free(b_fp_int);
+    fp_free(c_fp_int);
+
+    return res;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_invmod_obj, mod_invmod);
@@ -412,12 +447,22 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_invmod_obj, MP_ROM_PTR(&mod_i
 /* c = (a, b) */
 STATIC mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
 {
-    fp_int a_fp_int, b_fp_int, c_fp_int;
-    fp_init(&c_fp_int);
-    mp_fp_for_int(A_in, &a_fp_int);
-    mp_fp_for_int(B_in, &b_fp_int);
-    fp_gcd(&a_fp_int, &b_fp_int, &c_fp_int);
-    return mp_obj_new_int_from_fp(&c_fp_int);
+    fp_int *a_fp_int = fp_alloc();
+    fp_int *b_fp_int = fp_alloc();
+    fp_int *c_fp_int = fp_alloc();
+
+    mp_fp_for_int(A_in, a_fp_int);
+    mp_fp_for_int(B_in, b_fp_int);
+
+    fp_gcd(a_fp_int, b_fp_int, c_fp_int);
+
+    mp_obj_t res = mp_obj_new_int_from_fp(c_fp_int);
+
+    fp_free(a_fp_int);
+    fp_free(b_fp_int);
+    fp_free(c_fp_int);
+
+    return res;
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_gcd_obj, mod_gcd);
@@ -507,9 +552,15 @@ STATIC mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
     {
         mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT, mp_obj_get_type_str(args.a.u_obj));
     }
-    fp_int a_fp_int;
-    mp_fp_for_int(args.a.u_obj, &a_fp_int);
-    int ret = fp_isprime_ex(&a_fp_int, args.test.u_int);
+
+    fp_int *a_fp_int = fp_alloc();
+
+    mp_fp_for_int(args.a.u_obj, a_fp_int);
+
+    int ret = fp_isprime_ex(a_fp_int, args.test.u_int);
+
+    fp_free(a_fp_int);
+
     return mp_obj_new_bool(ret);
 }
 
@@ -544,39 +595,39 @@ MP_DEFINE_CONST_OBJ_TYPE(
 // point in a prime field
 typedef struct _ecc_point_t
 {
-    fp_int x;
-    fp_int y;
+    fp_int *x;
+    fp_int *y;
 } ecc_point_t;
 
 // curve over a prime field
 typedef struct _ecc_curve_t
 {
-    fp_int p;
-    fp_int a;
-    fp_int b;
-    fp_int q;
-    ecc_point_t g;
+    fp_int *p;
+    fp_int *a;
+    fp_int *b;
+    fp_int *q;
+    ecc_point_t *g;
     vstr_t name;
     vstr_t oid;
 } ecc_curve_t;
 
 typedef struct _ecdsa_signature_t
 {
-    fp_int r;
-    fp_int s;
+    fp_int *r;
+    fp_int *s;
 } ecdsa_signature_t;
 
 typedef struct _mp_curve_t
 {
     mp_obj_base_t base;
-    ecc_curve_t ecc_curve;
+    ecc_curve_t *ecc_curve;
 } mp_curve_t;
 
 typedef struct _mp_point_t
 {
     mp_obj_base_t base;
-    ecc_point_t ecc_point;
-    ecc_curve_t ecc_curve;
+    ecc_point_t *ecc_point;
+    ecc_curve_t *ecc_curve;
 } mp_point_t;
 
 typedef struct _mp_ecdsa_signature_t
@@ -594,16 +645,27 @@ STATIC mp_curve_t *new_curve_init_copy(mp_point_t *point)
 {
     mp_curve_t *c = m_new_obj(mp_curve_t);
     c->base.type = &curve_type;
-    vstr_init(&c->ecc_curve.name, vstr_len(&point->ecc_curve.oid));
-    vstr_add_strn(&c->ecc_curve.name, vstr_str(&point->ecc_curve.name), vstr_len(&point->ecc_curve.name));
-    vstr_init(&c->ecc_curve.oid, vstr_len(&point->ecc_curve.oid));
-    vstr_add_strn(&c->ecc_curve.oid, vstr_str(&point->ecc_curve.oid), vstr_len(&point->ecc_curve.oid));
-    fp_copy(&point->ecc_curve.p, &c->ecc_curve.p);
-    fp_copy(&point->ecc_curve.a, &c->ecc_curve.a);
-    fp_copy(&point->ecc_curve.b, &c->ecc_curve.b);
-    fp_copy(&point->ecc_curve.q, &c->ecc_curve.q);
-    fp_copy(&point->ecc_curve.g.x, &c->ecc_curve.g.x);
-    fp_copy(&point->ecc_curve.g.y, &c->ecc_curve.g.y);
+    c->ecc_curve = m_new_obj(ecc_curve_t);
+    c->ecc_curve->p = fp_alloc();
+    c->ecc_curve->a = fp_alloc();
+    c->ecc_curve->b = fp_alloc();
+    c->ecc_curve->q = fp_alloc();
+    c->ecc_curve->g = m_new_obj(ecc_point_t);
+    c->ecc_curve->g->x = fp_alloc();
+    c->ecc_curve->g->y = fp_alloc();
+
+    vstr_init(&c->ecc_curve->name, vstr_len(&point->ecc_curve->oid));
+    vstr_add_strn(&c->ecc_curve->name, vstr_str(&point->ecc_curve->name), vstr_len(&point->ecc_curve->name));
+    vstr_init(&c->ecc_curve->oid, vstr_len(&point->ecc_curve->oid));
+    vstr_add_strn(&c->ecc_curve->oid, vstr_str(&point->ecc_curve->oid), vstr_len(&point->ecc_curve->oid));
+
+    fp_copy(point->ecc_curve->p, c->ecc_curve->p);
+    fp_copy(point->ecc_curve->a, c->ecc_curve->a);
+    fp_copy(point->ecc_curve->b, c->ecc_curve->b);
+    fp_copy(point->ecc_curve->q, c->ecc_curve->q);
+    fp_copy(point->ecc_curve->g->x, c->ecc_curve->g->x);
+    fp_copy(point->ecc_curve->g->y, c->ecc_curve->g->y);
+
     return c;
 }
 
@@ -611,40 +673,54 @@ STATIC mp_point_t *new_point_init_copy(mp_curve_t *curve)
 {
     mp_point_t *pr = m_new_obj(mp_point_t);
     pr->base.type = &point_type;
-    vstr_init(&pr->ecc_curve.name, vstr_len(&curve->ecc_curve.oid));
-    vstr_add_strn(&pr->ecc_curve.name, vstr_str(&curve->ecc_curve.name), vstr_len(&curve->ecc_curve.name));
-    vstr_init(&pr->ecc_curve.oid, vstr_len(&curve->ecc_curve.oid));
-    vstr_add_strn(&pr->ecc_curve.oid, vstr_str(&curve->ecc_curve.oid), vstr_len(&curve->ecc_curve.oid));
-    fp_copy(&curve->ecc_curve.p, &pr->ecc_curve.p);
-    fp_copy(&curve->ecc_curve.a, &pr->ecc_curve.a);
-    fp_copy(&curve->ecc_curve.b, &pr->ecc_curve.b);
-    fp_copy(&curve->ecc_curve.q, &pr->ecc_curve.q);
-    fp_copy(&curve->ecc_curve.g.x, &pr->ecc_curve.g.x);
-    fp_copy(&curve->ecc_curve.g.y, &pr->ecc_curve.g.y);
-    fp_copy(&curve->ecc_curve.g.x, &pr->ecc_point.x);
-    fp_copy(&curve->ecc_curve.g.y, &pr->ecc_point.y);
+
+    pr->ecc_curve = m_new_obj(ecc_curve_t);
+    pr->ecc_curve->p = fp_alloc();
+    pr->ecc_curve->a = fp_alloc();
+    pr->ecc_curve->b = fp_alloc();
+    pr->ecc_curve->q = fp_alloc();
+    pr->ecc_curve->g = m_new_obj(ecc_point_t);
+    pr->ecc_curve->g->x = fp_alloc();
+    pr->ecc_curve->g->y = fp_alloc();
+    pr->ecc_point = m_new_obj(ecc_point_t);
+    pr->ecc_point->x = fp_alloc();
+    pr->ecc_point->y = fp_alloc();
+
+    vstr_init(&pr->ecc_curve->name, vstr_len(&curve->ecc_curve->oid));
+    vstr_add_strn(&pr->ecc_curve->name, vstr_str(&curve->ecc_curve->name), vstr_len(&curve->ecc_curve->name));
+    vstr_init(&pr->ecc_curve->oid, vstr_len(&curve->ecc_curve->oid));
+    vstr_add_strn(&pr->ecc_curve->oid, vstr_str(&curve->ecc_curve->oid), vstr_len(&curve->ecc_curve->oid));
+
+    fp_copy(curve->ecc_curve->p, pr->ecc_curve->p);
+    fp_copy(curve->ecc_curve->a, pr->ecc_curve->a);
+    fp_copy(curve->ecc_curve->b, pr->ecc_curve->b);
+    fp_copy(curve->ecc_curve->q, pr->ecc_curve->q);
+    fp_copy(curve->ecc_curve->g->x, pr->ecc_curve->g->x);
+    fp_copy(curve->ecc_curve->g->y, pr->ecc_curve->g->y);
+    fp_copy(curve->ecc_curve->g->x, pr->ecc_point->x);
+    fp_copy(curve->ecc_curve->g->y, pr->ecc_point->y);
     return pr;
 }
 
-STATIC bool ec_signature_equal(const ecdsa_signature_t *s1, const ecdsa_signature_t *s2)
+STATIC bool ec_signature_equal(ecdsa_signature_t *s1, ecdsa_signature_t *s2)
 {
-    if (fp_cmp((fp_int *)&s1->r, (fp_int *)&s2->r) != FP_EQ)
+    if (fp_cmp(s1->r, s2->r) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&s1->s, (fp_int *)&s2->s) != FP_EQ)
+    if (fp_cmp(s1->s, s2->s) != FP_EQ)
     {
         return false;
     }
     return true;
 }
 
-STATIC void signature_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+STATIC void signature_print(mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_ecdsa_signature_t *self = MP_OBJ_TO_PTR(self_in);
-    vstr_t *vstr_r = vstr_new_from_fp((fp_int *)&self->ecdsa_signature.r);
-    vstr_t *vstr_s = vstr_new_from_fp((fp_int *)&self->ecdsa_signature.s);
+    vstr_t *vstr_r = vstr_new_from_fp(self->ecdsa_signature.r);
+    vstr_t *vstr_s = vstr_new_from_fp(self->ecdsa_signature.s);
     mp_printf(print, "<Signature r=%s s=%s>", vstr_str(vstr_r), vstr_str(vstr_s));
     vstr_free(vstr_r);
     vstr_free(vstr_s);
@@ -681,12 +757,12 @@ STATIC void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
         {
             if (attr == MP_QSTR_r)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecdsa_signature.r);
+                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature.r);
                 return;
             }
             else if (attr == MP_QSTR_s)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecdsa_signature.s);
+                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature.s);
                 return;
             }
             mp_convert_member_lookup(obj, type, elem->value, dest);
@@ -710,27 +786,19 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, signature_attr,
     locals_dict, &signature_locals_dict);
 
-STATIC bool ec_point_in_curve(const ecc_point_t *point, const ecc_curve_t *curve)
+STATIC bool ec_point_in_curve(ecc_point_t *point, ecc_curve_t *curve)
 {
     int is_point_in_curve = 0;
-    fp_int x;
-    fp_int y;
-    fp_int left;
-    fp_int right;
-    fp_int x_mul_x_mul_x;
-    fp_int curvea_mul_x;
-    fp_int left_minus_right_mod_curvep;
+    fp_int *x = fp_alloc();
+    fp_int *y = fp_alloc();
+    fp_int *left = fp_alloc();
+    fp_int *right = fp_alloc();
+    fp_int *x_mul_x_mul_x = fp_alloc();
+    fp_int *curvea_mul_x = fp_alloc();
+    fp_int *left_minus_right_mod_curvep = fp_alloc();
 
-    fp_init(&x);
-    fp_init(&y);
-    fp_init(&left);
-    fp_init(&x_mul_x_mul_x);
-    fp_init(&curvea_mul_x);
-    fp_init(&right);
-    fp_init(&left_minus_right_mod_curvep);
-
-    fp_copy(&point->x, &x);
-    fp_copy(&point->y, &y);
+    fp_copy(point->x, x);
+    fp_copy(point->y, y);
 
     /*
     left = y * y
@@ -739,48 +807,57 @@ STATIC bool ec_point_in_curve(const ecc_point_t *point, const ecc_curve_t *curve
     */
 
     // left = (y * y)
-    fp_sqr(&y, &left);
+    fp_sqr(y, left);
 
     //(x * x * x)
-    fp_mul(&x, &x, &x_mul_x_mul_x);
-    fp_mul(&x_mul_x_mul_x, &x, &x_mul_x_mul_x);
+    fp_mul(x, x, x_mul_x_mul_x);
+    fp_mul(x_mul_x_mul_x, x, x_mul_x_mul_x);
 
     //(curve.a * x)
-    fp_mul((fp_int *)&curve->a, &x, &curvea_mul_x);
+    fp_mul(curve->a, x, curvea_mul_x);
 
     // right = (x * x * x) + (curve.a * x) + curve.b
-    fp_add(&x_mul_x_mul_x, &curvea_mul_x, &right);
-    fp_add(&right, (fp_int *)&curve->b, &right);
+    fp_add(x_mul_x_mul_x, curvea_mul_x, right);
+    fp_add(right, curve->b, right);
 
     // return (left - right) % curve.p == 0
-    fp_submod(&left, &right, (fp_int *)&curve->p, &left_minus_right_mod_curvep);
-    is_point_in_curve = (fp_iszero(&left_minus_right_mod_curvep) == FP_YES);
+    fp_submod(left, right, curve->p, left_minus_right_mod_curvep);
+    is_point_in_curve = (fp_iszero(left_minus_right_mod_curvep) == FP_YES);
+
+    fp_free(left);
+    fp_free(x_mul_x_mul_x);
+    fp_free(curvea_mul_x);
+    fp_free(right);
+    fp_free(left_minus_right_mod_curvep);
+    fp_free(x);
+    fp_free(y);
+
     return is_point_in_curve;
 }
 
-STATIC bool ec_curve_equal(const ecc_curve_t *c1, const ecc_curve_t *c2)
+STATIC bool ec_curve_equal(ecc_curve_t *c1, ecc_curve_t *c2)
 {
-    if (fp_cmp((fp_int *)&c1->p, (fp_int *)&c2->p) != FP_EQ)
+    if (fp_cmp(c1->p, c2->p) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&c1->a, (fp_int *)&c2->a) != FP_EQ)
+    if (fp_cmp(c1->a, c2->a) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&c1->b, (fp_int *)&c2->b) != FP_EQ)
+    if (fp_cmp(c1->b, c2->b) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&c1->q, (fp_int *)&c2->q) != FP_EQ)
+    if (fp_cmp(c1->q, c2->q) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&c1->g.x, (fp_int *)&c2->g.x) != FP_EQ)
+    if (fp_cmp(c1->g->x, c2->g->x) != FP_EQ)
     {
         return false;
     }
-    if (fp_cmp((fp_int *)&c1->g.y, (fp_int *)&c2->g.y) != FP_EQ)
+    if (fp_cmp(c1->g->y, c2->g->y) != FP_EQ)
     {
         return false;
     }
@@ -800,7 +877,7 @@ STATIC mp_obj_t curve_equal(mp_obj_t curve1, mp_obj_t curve2)
 
     mp_curve_t *c1 = MP_OBJ_TO_PTR(curve1);
     mp_curve_t *c2 = MP_OBJ_TO_PTR(curve2);
-    return mp_obj_new_bool(ec_curve_equal(&c1->ecc_curve, &c2->ecc_curve));
+    return mp_obj_new_bool(ec_curve_equal(c1->ecc_curve, c2->ecc_curve));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(curve_equal_obj, curve_equal);
@@ -819,7 +896,7 @@ STATIC mp_obj_t point_in_curve(mp_obj_t point, mp_obj_t curve)
 
     mp_point_t *p = MP_OBJ_TO_PTR(point);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
-    return mp_obj_new_bool(ec_point_in_curve(&p->ecc_point, &c->ecc_curve));
+    return mp_obj_new_bool(ec_point_in_curve(p->ecc_point, c->ecc_curve));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_in_curve_obj, point_in_curve);
@@ -830,14 +907,14 @@ STATIC void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     (void)kind;
     mp_curve_t *self = MP_OBJ_TO_PTR(self_in);
     vstr_t vstr_oid;
-    vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
-    vstr_t *ecc_curve_p = vstr_new_from_fp((fp_int *)&self->ecc_curve.p);
-    vstr_t *ecc_curve_a = vstr_new_from_fp((fp_int *)&self->ecc_curve.a);
-    vstr_t *ecc_curve_b = vstr_new_from_fp((fp_int *)&self->ecc_curve.b);
-    vstr_t *ecc_curve_q = vstr_new_from_fp((fp_int *)&self->ecc_curve.q);
-    vstr_t *ecc_curve_g_x = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.x);
-    vstr_t *ecc_curve_g_y = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.y);
-    mp_printf(print, "<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>", vstr_str(&self->ecc_curve.name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
+    vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve->oid), vstr_len(&self->ecc_curve->oid));
+    vstr_t *ecc_curve_p = vstr_new_from_fp(self->ecc_curve->p);
+    vstr_t *ecc_curve_a = vstr_new_from_fp(self->ecc_curve->a);
+    vstr_t *ecc_curve_b = vstr_new_from_fp(self->ecc_curve->b);
+    vstr_t *ecc_curve_q = vstr_new_from_fp(self->ecc_curve->q);
+    vstr_t *ecc_curve_g_x = vstr_new_from_fp(self->ecc_curve->g->x);
+    vstr_t *ecc_curve_g_y = vstr_new_from_fp(self->ecc_curve->g->y);
+    mp_printf(print, "<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>", vstr_str(&self->ecc_curve->name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
     vstr_free(ecc_curve_p);
     vstr_free(ecc_curve_a);
     vstr_free(ecc_curve_b);
@@ -858,7 +935,7 @@ STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_curve_t *l = MP_OBJ_TO_PTR(lhs);
         mp_curve_t *r = MP_OBJ_TO_PTR(rhs);
-        return curve_equal((mp_obj_t)l, (mp_obj_t)r);
+        return curve_equal(MP_OBJ_FROM_PTR(l), MP_OBJ_FROM_PTR(r));
     }
     case MP_BINARY_OP_CONTAINS:
     {
@@ -872,7 +949,7 @@ STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_curve_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
-        return point_in_curve((mp_obj_t)r, (mp_obj_t)l);
+        return point_in_curve(MP_OBJ_FROM_PTR(r), MP_OBJ_FROM_PTR(l));
     }
     default:
         return MP_OBJ_NULL; // op not supported
@@ -891,22 +968,22 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
         {
             if (attr == MP_QSTR_p)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.p);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->p);
                 return;
             }
             else if (attr == MP_QSTR_a)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.a);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->a);
                 return;
             }
             else if (attr == MP_QSTR_b)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.b);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->b);
                 return;
             }
             else if (attr == MP_QSTR_q)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.q);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->q);
                 return;
             }
             else if (attr == MP_QSTR_G)
@@ -917,22 +994,22 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
             }
             else if (attr == MP_QSTR_gx)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.g.x);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->g->x);
                 return;
             }
             else if (attr == MP_QSTR_gy)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_curve.g.y);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_curve->g->y);
                 return;
             }
             else if (attr == MP_QSTR_name)
             {
-                dest[0] = mp_obj_new_str_of_type(&mp_type_str, (const byte *)vstr_str(&self->ecc_curve.name), vstr_len(&self->ecc_curve.name));
+                dest[0] = mp_obj_new_str_of_type(&mp_type_str, (const byte *)vstr_str(&self->ecc_curve->name), vstr_len(&self->ecc_curve->name));
                 return;
             }
             else if (attr == MP_QSTR_oid)
             {
-                dest[0] = mp_obj_new_str_of_type(&mp_type_bytes, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
+                dest[0] = mp_obj_new_str_of_type(&mp_type_bytes, (const byte *)vstr_str(&self->ecc_curve->oid), vstr_len(&self->ecc_curve->oid));
                 return;
             }
             mp_convert_member_lookup(obj, type, elem->value, dest);
@@ -955,44 +1032,54 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 
         if (attr == MP_QSTR_p)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.p);
+            mp_fp_for_int(dest[1], self->ecc_curve->p);
         }
         else if (attr == MP_QSTR_a)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.a);
+            mp_fp_for_int(dest[1], self->ecc_curve->a);
         }
         else if (attr == MP_QSTR_b)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.b);
+            mp_fp_for_int(dest[1], self->ecc_curve->b);
         }
         else if (attr == MP_QSTR_q)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.q);
+            mp_fp_for_int(dest[1], self->ecc_curve->q);
         }
         else if (attr == MP_QSTR_G)
         {
             mp_point_t *other = MP_OBJ_TO_PTR(dest[1]);
-            fp_copy(&other->ecc_curve.p, &self->ecc_curve.p);
-            fp_copy(&other->ecc_curve.a, &self->ecc_curve.a);
-            fp_copy(&other->ecc_curve.b, &self->ecc_curve.b);
-            fp_copy(&other->ecc_curve.q, &self->ecc_curve.q);
-            fp_copy(&other->ecc_point.x, &self->ecc_curve.g.x);
-            fp_copy(&other->ecc_point.y, &self->ecc_curve.g.y);
+
+            self->ecc_curve = m_new_obj(ecc_curve_t);
+            self->ecc_curve->p = fp_alloc();
+            self->ecc_curve->a = fp_alloc();
+            self->ecc_curve->b = fp_alloc();
+            self->ecc_curve->q = fp_alloc();
+            self->ecc_curve->g = m_new_obj(ecc_point_t);
+            self->ecc_curve->g->x = fp_alloc();
+            self->ecc_curve->g->y = fp_alloc();
+
+            fp_copy(other->ecc_curve->p, self->ecc_curve->p);
+            fp_copy(other->ecc_curve->a, self->ecc_curve->a);
+            fp_copy(other->ecc_curve->b, self->ecc_curve->b);
+            fp_copy(other->ecc_curve->q, self->ecc_curve->q);
+            fp_copy(other->ecc_point->x, self->ecc_curve->g->x);
+            fp_copy(other->ecc_point->y, self->ecc_curve->g->y);
         }
         else if (attr == MP_QSTR_gx)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.g.x);
+            mp_fp_for_int(dest[1], self->ecc_curve->g->x);
         }
         else if (attr == MP_QSTR_gy)
         {
-            mp_fp_for_int(dest[1], &self->ecc_curve.g.y);
+            mp_fp_for_int(dest[1], self->ecc_curve->g->y);
         }
         else if (attr == MP_QSTR_name)
         {
             mp_buffer_info_t bufinfo_name;
             mp_get_buffer_raise(dest[1], &bufinfo_name, MP_BUFFER_READ);
-            vstr_init(&self->ecc_curve.name, bufinfo_name.len);
-            vstr_add_strn(&self->ecc_curve.name, bufinfo_name.buf, bufinfo_name.len);
+            vstr_init(&self->ecc_curve->name, bufinfo_name.len);
+            vstr_add_strn(&self->ecc_curve->name, bufinfo_name.buf, bufinfo_name.len);
         }
         else if (attr == MP_QSTR_oid)
         {
@@ -1001,12 +1088,12 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 
             if (MP_OBJ_IS_TYPE(dest[1], &mp_type_bytes))
             {
-                vstr_init(&self->ecc_curve.oid, bufinfo_oid.len);
-                vstr_add_strn(&self->ecc_curve.oid, bufinfo_oid.buf, bufinfo_oid.len);
+                vstr_init(&self->ecc_curve->oid, bufinfo_oid.len);
+                vstr_add_strn(&self->ecc_curve->oid, bufinfo_oid.buf, bufinfo_oid.len);
             }
             else if (MP_OBJ_IS_STR(dest[1]))
             {
-                vstr_unhexlify(&self->ecc_curve.oid, bufinfo_oid.buf, bufinfo_oid.len);
+                vstr_unhexlify(&self->ecc_curve->oid, bufinfo_oid.buf, bufinfo_oid.len);
             }
         }
         else
@@ -1074,8 +1161,17 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
     mp_curve_t *curve = m_new_obj(mp_curve_t);
     curve->base.type = &curve_type;
-    vstr_init(&curve->ecc_curve.name, 0);
-    vstr_init(&curve->ecc_curve.oid, 0);
+    curve->ecc_curve = m_new_obj(ecc_curve_t);
+    curve->ecc_curve->p = fp_alloc();
+    curve->ecc_curve->a = fp_alloc();
+    curve->ecc_curve->b = fp_alloc();
+    curve->ecc_curve->q = fp_alloc();
+    curve->ecc_curve->g = m_new_obj(ecc_point_t);
+    curve->ecc_curve->g->x = fp_alloc();
+    curve->ecc_curve->g->y = fp_alloc();
+
+    vstr_init(&curve->ecc_curve->name, 0);
+    vstr_init(&curve->ecc_curve->oid, 0);
     for (size_t i = 0; i < n_args; i++)
     {
         if (!MP_OBJ_IS_INT(pos_args[i]))
@@ -1084,12 +1180,12 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
         }
     }
 
-    mp_fp_for_int(args.p.u_obj, &curve->ecc_curve.p);
-    mp_fp_for_int(args.a.u_obj, &curve->ecc_curve.a);
-    mp_fp_for_int(args.b.u_obj, &curve->ecc_curve.b);
-    mp_fp_for_int(args.q.u_obj, &curve->ecc_curve.q);
-    mp_fp_for_int(args.gx.u_obj, &curve->ecc_curve.g.x);
-    mp_fp_for_int(args.gy.u_obj, &curve->ecc_curve.g.y);
+    mp_fp_for_int(args.p.u_obj, curve->ecc_curve->p);
+    mp_fp_for_int(args.a.u_obj, curve->ecc_curve->a);
+    mp_fp_for_int(args.b.u_obj, curve->ecc_curve->b);
+    mp_fp_for_int(args.q.u_obj, curve->ecc_curve->q);
+    mp_fp_for_int(args.gx.u_obj, curve->ecc_curve->g->x);
+    mp_fp_for_int(args.gy.u_obj, curve->ecc_curve->g->y);
 
     if (args.name.u_obj != mp_const_none)
     {
@@ -1101,7 +1197,7 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
         {
             mp_buffer_info_t bufinfo_name;
             mp_get_buffer_raise(args.name.u_obj, &bufinfo_name, MP_BUFFER_READ);
-            vstr_add_strn(&curve->ecc_curve.name, bufinfo_name.buf, bufinfo_name.len);
+            vstr_add_strn(&curve->ecc_curve->name, bufinfo_name.buf, bufinfo_name.len);
         }
     }
 
@@ -1118,17 +1214,17 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
 
             if (MP_OBJ_IS_TYPE(args.oid.u_obj, &mp_type_bytes))
             {
-                vstr_init(&curve->ecc_curve.oid, bufinfo_oid.len);
-                vstr_add_strn(&curve->ecc_curve.oid, bufinfo_oid.buf, bufinfo_oid.len);
+                vstr_init(&curve->ecc_curve->oid, bufinfo_oid.len);
+                vstr_add_strn(&curve->ecc_curve->oid, bufinfo_oid.buf, bufinfo_oid.len);
             }
             else if (MP_OBJ_IS_STR(args.oid.u_obj))
             {
-                vstr_unhexlify(&curve->ecc_curve.oid, bufinfo_oid.buf, bufinfo_oid.len);
+                vstr_unhexlify(&curve->ecc_curve->oid, bufinfo_oid.buf, bufinfo_oid.len);
             }
         }
     }
 
-    return (mp_obj_t)curve;
+    return MP_OBJ_FROM_PTR(curve);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(curve_obj, 6, curve);
@@ -1136,84 +1232,91 @@ STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_curve_obj, MP_ROM_PTR(&curve_obj)
 
 ///////////////////////////////////// Point ////////////////////////////////////
 
-STATIC bool ec_point_equal(const ecc_point_t *p1, const ecc_point_t *p2)
+STATIC bool ec_point_equal(ecc_point_t *p1, ecc_point_t *p2)
 {
     // check x coords
-    if (fp_cmp((fp_int *)&p1->x, (fp_int *)&p2->x) != FP_EQ)
+    if (fp_cmp(p1->x, p2->x) != FP_EQ)
     {
         return false;
     }
     // check y coords
-    if (fp_cmp((fp_int *)&p1->y, (fp_int *)&p2->y) != FP_EQ)
+    if (fp_cmp(p1->y, p2->y) != FP_EQ)
     {
         return false;
     }
     return true;
 }
 
-STATIC void ec_point_double(const ecc_point_t *rop, const ecc_point_t *op, const ecc_curve_t *curve)
+STATIC void ec_point_double(ecc_point_t *rop, ecc_point_t *op, ecc_curve_t *curve)
 {
-    if (fp_cmp_d((fp_int *)&op->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op->y, 0) == FP_EQ)
+    if (fp_cmp_d(op->x, 0) == FP_EQ && fp_cmp_d(op->y, 0) == FP_EQ)
     {
-        fp_set((fp_int *)&rop->x, 0);
-        fp_set((fp_int *)&rop->y, 0);
+        fp_set(rop->x, 0);
+        fp_set(rop->y, 0);
         return;
     }
 
-    fp_int numer, denom, lambda;
-    fp_init(&numer);
-    fp_init(&denom);
-    fp_init(&lambda);
+    fp_int *numer = fp_alloc();
+    fp_int *denom = fp_alloc();
+    fp_int *lambda = fp_alloc();
 
     // calculate lambda
-    fp_mul((fp_int *)&op->x, (fp_int *)&op->x, &numer);
-    fp_mul_d(&numer, 3, &numer);
-    fp_add(&numer, (fp_int *)&curve->a, &numer);
-    fp_mul_d((fp_int *)&op->y, 2, &denom);
+    fp_mul(op->x, op->x, numer);
+    fp_mul_d(numer, 3, numer);
+    fp_add(numer, curve->a, numer);
+    fp_mul_d(op->y, 2, denom);
 
     // handle 2P = identity case
-    if (fp_invmod(&denom, (fp_int *)&curve->p, &denom) != FP_OKAY)
+    if (fp_invmod(denom, curve->p, denom) != FP_OKAY)
     {
-        fp_set((fp_int *)&rop->x, 0);
-        fp_set((fp_int *)&rop->y, 0);
+        fp_set(rop->x, 0);
+        fp_set(rop->y, 0);
+
+        fp_free(numer);
+        fp_free(denom);
+        fp_free(lambda);
         return;
     }
 
-    fp_mul(&numer, &denom, &lambda);
-    fp_mod(&lambda, (fp_int *)&curve->p, &lambda);
+    fp_mul(numer, denom, lambda);
+    fp_mod(lambda, curve->p, lambda);
 
     // calculate resulting x coord
-    fp_mul(&lambda, &lambda, (fp_int *)&rop->x);
-    fp_sub((fp_int *)&rop->x, (fp_int *)&op->x, (fp_int *)&rop->x);
-    fp_sub((fp_int *)&rop->x, (fp_int *)&op->x, (fp_int *)&rop->x);
-    fp_mod((fp_int *)&rop->x, (fp_int *)&curve->p, (fp_int *)&rop->x);
+    fp_mul(lambda, lambda, rop->x);
+    fp_sub(rop->x, op->x, rop->x);
+    fp_sub(rop->x, op->x, rop->x);
+    fp_mod(rop->x, curve->p, rop->x);
 
     // calculate resulting y coord
-    fp_sub((fp_int *)&op->x, (fp_int *)&rop->x, (fp_int *)&rop->y);
-    fp_mul(&lambda, (fp_int *)&rop->y, (fp_int *)&rop->y);
-    fp_sub((fp_int *)&rop->y, (fp_int *)&op->y, (fp_int *)&rop->y);
-    fp_mod((fp_int *)&rop->y, (fp_int *)&curve->p, (fp_int *)&rop->y);
+    fp_sub(op->x, rop->x, rop->y);
+    fp_mul(lambda, rop->y, rop->y);
+    fp_sub(rop->y, op->y, rop->y);
+    fp_mod(rop->y, curve->p, rop->y);
+
+    fp_free(numer);
+    fp_free(denom);
+    fp_free(lambda);
 }
 
-STATIC void ec_point_add(ecc_point_t *rop, const ecc_point_t *op1, const ecc_point_t *op2, const ecc_curve_t *curve)
+STATIC void ec_point_add(ecc_point_t *rop, ecc_point_t *op1, ecc_point_t *op2, ecc_curve_t *curve)
 {
     // handle the identity element
-    if (fp_cmp_d((fp_int *)&op1->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op1->y, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->y, 0) == FP_EQ)
+    if (fp_cmp_d(op1->x, 0) == FP_EQ && fp_cmp_d(op1->y, 0) == FP_EQ && fp_cmp_d(op2->x, 0) == FP_EQ && fp_cmp_d(op2->y, 0) == FP_EQ)
     {
-        fp_set((fp_int *)&rop->x, 0);
-        fp_set((fp_int *)&rop->y, 0);
+        fp_set(rop->x, 0);
+        fp_set(rop->y, 0);
         return;
     }
-    else if (fp_cmp_d((fp_int *)&op1->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op1->y, 0) == FP_EQ)
+    else if (fp_cmp_d(op1->x, 0) == FP_EQ && fp_cmp_d(op1->y, 0) == FP_EQ)
     {
-        fp_copy((fp_int *)&op2->x, &rop->x);
-        fp_copy((fp_int *)&op2->y, &rop->y);
+        fp_copy(op2->x, rop->x);
+        fp_copy(op2->y, rop->y);
         return;
     }
-    else if (fp_cmp_d((fp_int *)&op2->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&op2->y, 0) == FP_EQ)
+    else if (fp_cmp_d(op2->x, 0) == FP_EQ && fp_cmp_d(op2->y, 0) == FP_EQ)
     {
-        fp_copy((fp_int *)&op1->x, &rop->x);
-        fp_copy((fp_int *)&op1->y, &rop->y);
+        fp_copy(op1->x, rop->x);
+        fp_copy(op1->y, rop->y);
         return;
     }
 
@@ -1224,243 +1327,307 @@ STATIC void ec_point_add(ecc_point_t *rop, const ecc_point_t *op1, const ecc_poi
     }
 
     // check if points sum to identity element
-    fp_int negy;
-    fp_init(&negy);
-    fp_sub((fp_int *)&curve->p, (fp_int *)&op2->y, &negy);
-    if (fp_cmp((fp_int *)&op1->x, (fp_int *)&op2->x) == FP_EQ && fp_cmp((fp_int *)&op1->y, &negy) == 0)
+    fp_int *negy = fp_alloc();
+
+    fp_sub(curve->p, op2->y, negy);
+    if (fp_cmp(op1->x, op2->x) == FP_EQ && fp_cmp(op1->y, negy) == 0)
     {
-        fp_set((fp_int *)&rop->x, 0);
-        fp_set((fp_int *)&rop->y, 0);
+        fp_set(rop->x, 0);
+        fp_set(rop->y, 0);
+
+        fp_free(negy);
         return;
     }
 
-    fp_int xdiff, ydiff, lambda;
-    fp_init(&xdiff);
-    fp_init(&ydiff);
-    fp_init(&lambda);
+    fp_int *xdiff = fp_alloc();
+    fp_int *ydiff = fp_alloc();
+    fp_int *lambda = fp_alloc();
 
     // calculate lambda
-    fp_sub((fp_int *)&op2->y, (fp_int *)&op1->y, &ydiff);
-    fp_sub((fp_int *)&op2->x, (fp_int *)&op1->x, &xdiff);
-    fp_invmod(&xdiff, (fp_int *)&curve->p, &xdiff);
-    fp_mul(&ydiff, &xdiff, &lambda);
-    fp_mod(&lambda, (fp_int *)&curve->p, &lambda);
+    fp_sub(op2->y, op1->y, ydiff);
+    fp_sub(op2->x, op1->x, xdiff);
+    fp_invmod(xdiff, curve->p, xdiff);
+    fp_mul(ydiff, xdiff, lambda);
+    fp_mod(lambda, curve->p, lambda);
 
     // calculate resulting x coord
-    fp_mul(&lambda, &lambda, (fp_int *)&rop->x);
-    fp_sub((fp_int *)&rop->x, (fp_int *)&op1->x, (fp_int *)&rop->x);
-    fp_sub((fp_int *)&rop->x, (fp_int *)&op2->x, (fp_int *)&rop->x);
-    fp_mod((fp_int *)&rop->x, (fp_int *)&curve->p, (fp_int *)&rop->x);
+    fp_mul(lambda, lambda, rop->x);
+    fp_sub(rop->x, op1->x, rop->x);
+    fp_sub(rop->x, op2->x, rop->x);
+    fp_mod(rop->x, curve->p, rop->x);
 
     // calculate resulting y coord
-    fp_sub((fp_int *)&op1->x, (fp_int *)&rop->x, (fp_int *)&rop->y);
-    fp_mul(&lambda, (fp_int *)&rop->y, (fp_int *)&rop->y);
-    fp_sub((fp_int *)&rop->y, (fp_int *)&op1->y, (fp_int *)&rop->y);
-    fp_mod((fp_int *)&rop->y, (fp_int *)&curve->p, (fp_int *)&rop->y);
+    fp_sub(op1->x, rop->x, rop->y);
+    fp_mul(lambda, rop->y, rop->y);
+    fp_sub(rop->y, op1->y, rop->y);
+    fp_mod(rop->y, curve->p, rop->y);
+
+    fp_free(xdiff);
+    fp_free(ydiff);
+    fp_free(lambda);
+    fp_free(negy);
 }
 
-STATIC void ec_point_mul(ecc_point_t *rop, const ecc_point_t *point, const fp_int scalar, const ecc_curve_t *curve)
+STATIC void ec_point_mul(ecc_point_t *rop, ecc_point_t *point, fp_int scalar, ecc_curve_t *curve)
 {
     // handle the identity element
-    if (fp_cmp_d((fp_int *)&point->x, 0) == FP_EQ && fp_cmp_d((fp_int *)&point->y, 0) == FP_EQ)
+    if (fp_cmp_d(point->x, 0) == FP_EQ && fp_cmp_d(point->y, 0) == FP_EQ)
     {
-        fp_set((fp_int *)&rop->x, 0);
-        fp_set((fp_int *)&rop->y, 0);
+        fp_set(rop->x, 0);
+        fp_set(rop->y, 0);
         return;
     }
 
     bool scalar_is_negative = false;
-    if (fp_cmp_d((fp_int *)&scalar, 2) == FP_EQ)
+    if (fp_cmp_d(&scalar, 2) == FP_EQ)
     {
         ec_point_double(rop, point, curve);
         return;
     }
 
-    fp_int point_y_fp_int;
-    if (fp_cmp_d((fp_int *)&scalar, 0) == FP_LT)
+    if (fp_cmp_d(&scalar, 0) == FP_LT)
     {
         scalar_is_negative = true;
     }
 
+    fp_int *point_y_fp_int = fp_alloc();
+
     if (scalar_is_negative)
     {
         // copy point.y
-        fp_copy((fp_int *)&point->y, &point_y_fp_int);
+        fp_copy(point->y, point_y_fp_int);
         // -point.y % curve.p
-        fp_neg((fp_int *)&point->y, (fp_int *)&point->y);
-        fp_mod((fp_int *)&point->y, (fp_int *)&curve->p, (fp_int *)&point->y);
+        fp_neg(point->y, point->y);
+        fp_mod(point->y, curve->p, point->y);
 
         // -scalar
-        fp_neg((fp_int *)&scalar, (fp_int *)&scalar);
+        fp_neg(&scalar, &scalar);
     }
 
-    ecc_point_t R0, R1, tmp;
-    fp_init(&R1.x);
-    fp_init(&R1.y);
-    fp_init(&tmp.x);
-    fp_init(&tmp.y);
-    fp_copy((fp_int *)&point->x, (fp_int *)&R0.x);
-    fp_copy((fp_int *)&point->y, (fp_int *)&R0.y);
-    ec_point_double(&R1, point, curve);
-    int dbits = fp_count_bits((fp_int *)&scalar), i;
+    ecc_point_t *R0 = m_new_obj(ecc_point_t);
+    R0->x = fp_alloc();
+    R0->y = fp_alloc();
+
+    ecc_point_t *R1 = m_new_obj(ecc_point_t);
+    R1->x = fp_alloc();
+    R1->y = fp_alloc();
+
+    ecc_point_t *tmp = m_new_obj(ecc_point_t);
+    tmp->x = fp_alloc();
+    tmp->y = fp_alloc();
+
+    fp_copy(point->x, R0->x);
+    fp_copy(point->y, R0->y);
+
+    ec_point_double(R1, point, curve);
+
+    int dbits = fp_count_bits(&scalar), i;
     for (i = dbits - 2; i >= 0; i--)
     {
         if (fp_tstbit(scalar, i))
         {
-            fp_copy((fp_int *)&R0.x, (fp_int *)&tmp.x);
-            fp_copy((fp_int *)&R0.y, (fp_int *)&tmp.y);
-            ec_point_add(&R0, &R1, &tmp, curve);
-            fp_copy((fp_int *)&R1.x, (fp_int *)&tmp.x);
-            fp_copy((fp_int *)&R1.y, (fp_int *)&tmp.y);
-            ec_point_double(&R1, &tmp, curve);
+            fp_copy(R0->x, tmp->x);
+            fp_copy(R0->y, tmp->y);
+
+            ec_point_add(R0, R1, tmp, curve);
+
+            fp_copy(R1->x, tmp->x);
+            fp_copy(R1->y, tmp->y);
+
+            ec_point_double(R1, tmp, curve);
         }
         else
         {
-            fp_copy((fp_int *)&R1.x, (fp_int *)&tmp.x);
-            fp_copy((fp_int *)&R1.y, (fp_int *)&tmp.y);
-            ec_point_add(&R1, &R0, &tmp, curve);
-            fp_copy((fp_int *)&R0.x, (fp_int *)&tmp.x);
-            fp_copy((fp_int *)&R0.y, (fp_int *)&tmp.y);
-            ec_point_double(&R0, &tmp, curve);
+            fp_copy(R1->x, tmp->x);
+            fp_copy(R1->y, tmp->y);
+
+            ec_point_add(R1, R0, tmp, curve);
+
+            fp_copy(R0->x, tmp->x);
+            fp_copy(R0->y, tmp->y);
+
+            ec_point_double(R0, tmp, curve);
         }
     }
 
-    fp_copy((fp_int *)&R0.x, (fp_int *)&rop->x);
-    fp_copy((fp_int *)&R0.y, (fp_int *)&rop->y);
+    fp_copy(R0->x, rop->x);
+    fp_copy(R0->y, rop->y);
 
     if (scalar_is_negative)
     {
         // restore point.y
-        fp_copy(&point_y_fp_int, (fp_int *)&point->y);
+        fp_copy(point_y_fp_int, point->y);
         // restore scalar
-        fp_neg((fp_int *)&scalar, (fp_int *)&scalar);
+        fp_neg(&scalar, &scalar);
     }
+
+    fp_free(R0->x);
+    fp_free(R0->y);
+    m_del_obj(ecc_point_t, R0);
+
+    fp_free(R1->x);
+    fp_free(R1->y);
+    m_del_obj(ecc_point_t, R1);
+
+    fp_free(tmp->x);
+    fp_free(tmp->y);
+    m_del_obj(ecc_point_t, tmp);
 }
 
-STATIC void ec_point_shamirs_trick(ecc_point_t *rop, const ecc_point_t *point1, const fp_int scalar1, const ecc_point_t *point2, const fp_int scalar2, const ecc_curve_t *curve)
+STATIC void ec_point_shamirs_trick(ecc_point_t *rop, ecc_point_t *point1, fp_int scalar1, ecc_point_t *point2, fp_int scalar2, ecc_curve_t *curve)
 {
-    ecc_point_t sum, tmp;
-    fp_init(&sum.x);
-    fp_init(&sum.y);
-    fp_init(&tmp.x);
-    fp_init(&tmp.y);
-    ec_point_add(&sum, point1, point2, curve);
+    ecc_point_t *sum = m_new_obj(ecc_point_t);
+    sum->x = fp_alloc();
+    sum->y = fp_alloc();
 
-    int scalar1Bits = fp_count_bits((fp_int *)&scalar1);
-    int scalar2Bits = fp_count_bits((fp_int *)&scalar2);
+    ecc_point_t *tmp = m_new_obj(ecc_point_t);
+    tmp->x = fp_alloc();
+    tmp->y = fp_alloc();
+
+    ec_point_add(sum, point1, point2, curve);
+
+    int scalar1Bits = fp_count_bits(&scalar1);
+    int scalar2Bits = fp_count_bits(&scalar2);
     int l = (scalar1Bits > scalar2Bits ? scalar1Bits : scalar2Bits) - 1;
 
     if (fp_tstbit(scalar1, l) && fp_tstbit(scalar2, l))
     {
-        fp_copy((fp_int *)&sum.x, (fp_int *)&rop->x);
-        fp_copy((fp_int *)&sum.y, (fp_int *)&rop->y);
+        fp_copy(sum->x, rop->x);
+        fp_copy(sum->y, rop->y);
     }
     else if (fp_tstbit(scalar1, l))
     {
-        fp_copy((fp_int *)&point1->x, (fp_int *)&rop->x);
-        fp_copy((fp_int *)&point1->y, (fp_int *)&rop->y);
+        fp_copy(point1->x, rop->x);
+        fp_copy(point1->y, rop->y);
     }
     else if (fp_tstbit(scalar2, l))
     {
-        fp_copy((fp_int *)&point2->x, (fp_int *)&rop->x);
-        fp_copy((fp_int *)&point2->y, (fp_int *)&rop->y);
+        fp_copy(point2->x, rop->x);
+        fp_copy(point2->y, rop->y);
     }
 
     for (l = l - 1; l >= 0; l--)
     {
-        fp_copy((fp_int *)&rop->x, (fp_int *)&tmp.x);
-        fp_copy((fp_int *)&rop->y, (fp_int *)&tmp.y);
-        ec_point_double(rop, &tmp, curve);
+        fp_copy(rop->x, tmp->x);
+        fp_copy(rop->y, tmp->y);
 
-        fp_copy((fp_int *)&rop->x, (fp_int *)&tmp.x);
-        fp_copy((fp_int *)&rop->y, (fp_int *)&tmp.y);
+        ec_point_double(rop, tmp, curve);
+
+        fp_copy(rop->x, tmp->x);
+        fp_copy(rop->y, tmp->y);
 
         if (fp_tstbit(scalar1, l) && fp_tstbit(scalar2, l))
         {
-            ec_point_add(rop, &tmp, &sum, curve);
+            ec_point_add(rop, tmp, sum, curve);
         }
         else if (fp_tstbit(scalar1, l))
         {
-            ec_point_add(rop, &tmp, point1, curve);
+            ec_point_add(rop, tmp, point1, curve);
         }
         else if (fp_tstbit(scalar2, l))
         {
-            ec_point_add(rop, &tmp, point2, curve);
+            ec_point_add(rop, tmp, point2, curve);
         }
     }
+
+    fp_free(sum->x);
+    fp_free(sum->y);
+    m_del_obj(ecc_point_t, sum);
+
+    fp_free(tmp->x);
+    fp_free(tmp->y);
+    m_del_obj(ecc_point_t, tmp);
 }
 
-STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, fp_int d, fp_int k, const ecc_curve_t *curve)
+STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, fp_int d, fp_int k, ecc_curve_t *curve)
 {
-    fp_int e, kinv;
+    fp_int *e = fp_alloc();
+    fp_int *kinv = fp_alloc();
 
     // R = k * G, r = R[x]
-    ecc_point_t R;
-    fp_init(&R.x);
-    fp_init(&R.y);
-    ec_point_mul(&R, &curve->g, k, curve);
-    fp_init(&sig->r);
-    fp_copy((fp_int *)&R.x, (fp_int *)&sig->r);
-    fp_mod((fp_int *)&sig->r, (fp_int *)&curve->q, (fp_int *)&sig->r);
+    ecc_point_t *R = m_new_obj(ecc_point_t);
+    R->x = fp_alloc();
+    R->y = fp_alloc();
+
+    ec_point_mul(R, curve->g, k, curve);
+    fp_copy(R->x, sig->r);
+    fp_mod(sig->r, curve->q, sig->r);
 
     // convert digest to integer (digest is computed as hex in ecdsa.py)
-    fp_read_radix(&e, (const char *)msg, 16);
+    fp_read_radix(e, (const char *)msg, 16);
 
-    int orderBits = fp_count_bits((fp_int *)&curve->q);
+    int orderBits = fp_count_bits(curve->q);
     int digestBits = msg_len * 4;
 
     if (digestBits > orderBits)
     {
-        fp_int n;
-        fp_init(&n);
-        fp_2expt(&n, digestBits - orderBits);
-        fp_div(&e, &n, &e, NULL);
+        fp_int *n = fp_alloc();
+        fp_2expt(n, digestBits - orderBits);
+        fp_div(e, n, e, NULL);
+        fp_free(n);
     }
 
     // s = (k^-1 * (e + d * r)) mod n
-    fp_init(&kinv);
-    fp_invmod(&k, (fp_int *)&curve->q, &kinv);
-    fp_init(&sig->s);
-    fp_mul(&d, (fp_int *)&sig->r, (fp_int *)&sig->s);
-    fp_add((fp_int *)&sig->s, &e, (fp_int *)&sig->s);
-    fp_mul((fp_int *)&sig->s, &kinv, (fp_int *)&sig->s);
-    fp_mod((fp_int *)&sig->s, (fp_int *)&curve->q, (fp_int *)&sig->s);
+    fp_invmod(&k, curve->q, kinv);
+    fp_zero(sig->s);
+
+    fp_mul(&d, sig->r, sig->s);
+    fp_add(sig->s, e, sig->s);
+    fp_mul(sig->s, kinv, sig->s);
+    fp_mod(sig->s, curve->q, sig->s);
+
+    fp_free(e);
+    fp_free(kinv);
+
+    fp_free(R->x);
+    fp_free(R->y);
+    m_del_obj(ecc_point_t, R);
 }
 
-STATIC int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, ecc_point_t *Q, const ecc_curve_t *curve)
+STATIC int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, ecc_point_t *Q, ecc_curve_t *curve)
 {
-    fp_int e, w, u1, u2;
-    ecc_point_t tmp;
-    fp_init(&w);
-    fp_init(&u1);
-    fp_init(&u2);
-    fp_init(&tmp.x);
-    fp_init(&tmp.y);
+    fp_int *e = fp_alloc();
+    fp_int *w = fp_alloc();
+    fp_int *u1 = fp_alloc();
+    fp_int *u2 = fp_alloc();
+
+    ecc_point_t *tmp = m_new_obj(ecc_point_t);
+    tmp->x = fp_alloc();
+    tmp->y = fp_alloc();
 
     // convert digest to integer (digest is computed as hex in ecdsa.py)
-    fp_read_radix(&e, (const char *)msg, 16);
+    fp_read_radix(e, (const char *)msg, 16);
 
-    int orderBits = fp_count_bits((fp_int *)&curve->q);
+    int orderBits = fp_count_bits(curve->q);
     int digestBits = msg_len * 4;
 
     if (digestBits > orderBits)
     {
-        fp_int tmp_;
-        fp_init(&tmp_);
-        fp_2expt(&tmp_, digestBits - orderBits);
-        fp_div(&e, &tmp_, &e, NULL);
+        fp_int *tmp_ = fp_alloc();
+        fp_2expt(tmp_, digestBits - orderBits);
+        fp_div(e, tmp_, e, NULL);
+        fp_free(tmp_);
     }
 
-    fp_invmod((fp_int *)&sig->s, (fp_int *)&curve->q, &w);
-    fp_mul(&e, &w, &u1);
-    fp_mod(&u1, (fp_int *)&curve->q, &u1);
-    fp_mul((fp_int *)&sig->r, &w, &u2);
-    fp_mod(&u2, (fp_int *)&curve->q, &u2);
+    fp_invmod(sig->s, curve->q, w);
+    fp_mul(e, w, u1);
+    fp_mod(u1, curve->q, u1);
+    fp_mul(sig->r, w, u2);
+    fp_mod(u2, curve->q, u2);
 
-    ec_point_shamirs_trick(&tmp, &curve->g, u1, Q, u2, curve);
-    fp_mod((fp_int *)&tmp.x, (fp_int *)&curve->q, (fp_int *)&tmp.x);
+    ec_point_shamirs_trick(tmp, curve->g, *u1, Q, *u2, curve);
+    fp_mod(tmp->x, curve->q, tmp->x);
 
-    int equal = (fp_cmp((fp_int *)&tmp.x, (fp_int *)&sig->r) == FP_EQ);
+    int equal = (fp_cmp(tmp->x, sig->r) == FP_EQ);
+
+    fp_free(e);
+    fp_free(w);
+    fp_free(u1);
+    fp_free(u2);
+
+    fp_free(tmp->x);
+    fp_free(tmp->y);
+    m_del_obj(ecc_point_t, tmp);
     return equal;
 }
 
@@ -1477,7 +1644,7 @@ STATIC mp_obj_t point_equal(mp_obj_t point1, mp_obj_t point2)
 
     mp_point_t *p1 = MP_OBJ_TO_PTR(point1);
     mp_point_t *p2 = MP_OBJ_TO_PTR(point2);
-    return mp_obj_new_bool(ec_point_equal(&p1->ecc_point, &p2->ecc_point));
+    return mp_obj_new_bool(ec_point_equal(p1->ecc_point, p2->ecc_point));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_equal_obj, point_equal);
@@ -1498,8 +1665,8 @@ STATIC mp_obj_t point_double(mp_obj_t point, mp_obj_t curve)
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
 
     mp_point_t *pr = new_point_init_copy(c);
-    ec_point_double(&pr->ecc_point, &p->ecc_point, &c->ecc_curve);
-    return (mp_obj_t)pr;
+    ec_point_double(pr->ecc_point, p->ecc_point, c->ecc_curve);
+    return MP_OBJ_FROM_PTR(pr);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_double_obj, point_double);
@@ -1525,8 +1692,8 @@ STATIC mp_obj_t point_add(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
 
     mp_point_t *pr = new_point_init_copy(c);
-    ec_point_add(&pr->ecc_point, &p1->ecc_point, &p2->ecc_point, &c->ecc_curve);
-    return (mp_obj_t)pr;
+    ec_point_add(pr->ecc_point, p1->ecc_point, p2->ecc_point, c->ecc_curve);
+    return MP_OBJ_FROM_PTR(pr);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_add_obj, point_add);
@@ -1552,17 +1719,22 @@ STATIC mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
 
     // -point2.y % curve.p
-    fp_int p2_y_fp_int;
-    fp_copy((fp_int *)&p2->ecc_point.y, &p2_y_fp_int);
-    fp_neg((fp_int *)&p2->ecc_point.y, (fp_int *)&p2->ecc_point.y);
-    fp_mod((fp_int *)&p2->ecc_point.y, (fp_int *)&c->ecc_curve.p, (fp_int *)&p2->ecc_point.y);
+    fp_int *p2_y_fp_int = fp_alloc();
+
+    fp_copy(p2->ecc_point->y, p2_y_fp_int);
+
+    fp_neg(p2->ecc_point->y, p2->ecc_point->y);
+    fp_mod(p2->ecc_point->y, c->ecc_curve->p, p2->ecc_point->y);
 
     mp_point_t *pr = new_point_init_copy(c);
-    ec_point_add(&pr->ecc_point, &p1->ecc_point, &p2->ecc_point, &c->ecc_curve);
+    ec_point_add(pr->ecc_point, p1->ecc_point, p2->ecc_point, c->ecc_curve);
 
     // restore point.y
-    fp_copy(&p2_y_fp_int, (fp_int *)&p2->ecc_point.y);
-    return (mp_obj_t)pr;
+    fp_copy(p2_y_fp_int, p2->ecc_point->y);
+
+    fp_free(p2_y_fp_int);
+
+    return MP_OBJ_FROM_PTR(pr);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_sub_obj, point_sub);
@@ -1585,12 +1757,17 @@ STATIC mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
 
     mp_point_t *p = MP_OBJ_TO_PTR(point);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
-    fp_int s_fp_int;
-    mp_fp_for_int(scalar, &s_fp_int);
+
+    fp_int *s_fp_int = fp_alloc();
+
+    mp_fp_for_int(scalar, s_fp_int);
 
     mp_point_t *pr = new_point_init_copy(c);
-    ec_point_mul(&pr->ecc_point, &p->ecc_point, s_fp_int, &c->ecc_curve);
-    return (mp_obj_t)pr;
+    ec_point_mul(pr->ecc_point, p->ecc_point, *s_fp_int, c->ecc_curve);
+
+    fp_free(s_fp_int);
+
+    return MP_OBJ_FROM_PTR(pr);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_mul_obj, point_mul);
@@ -1618,10 +1795,13 @@ STATIC mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *
         }
     }
 
-    mp_fp_for_int(args.r.u_obj, &signature->ecdsa_signature.r);
-    mp_fp_for_int(args.s.u_obj, &signature->ecdsa_signature.s);
+    signature->ecdsa_signature.r = fp_alloc();
+    signature->ecdsa_signature.s = fp_alloc();
 
-    return (mp_obj_t)signature;
+    mp_fp_for_int(args.r.u_obj, signature->ecdsa_signature.r);
+    mp_fp_for_int(args.s.u_obj, signature->ecdsa_signature.s);
+
+    return MP_OBJ_FROM_PTR(signature);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(signature_obj, 2, signature);
@@ -1651,15 +1831,25 @@ STATIC mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
     }
 
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
-    fp_int d_fp_int;
-    mp_fp_for_int(d, &d_fp_int);
-    fp_int k_fp_int;
-    mp_fp_for_int(k, &k_fp_int);
+
+    fp_int *d_fp_int = fp_alloc();
+    fp_int *k_fp_int = fp_alloc();
+
+    mp_fp_for_int(d, d_fp_int);
+    mp_fp_for_int(k, k_fp_int);
 
     mp_ecdsa_signature_t *sr = m_new_obj(mp_ecdsa_signature_t);
     sr->base.type = &signature_type;
-    ecdsa_s(&sr->ecdsa_signature, bufinfo.buf, bufinfo.len, d_fp_int, k_fp_int, &c->ecc_curve);
-    return (mp_obj_t)sr;
+
+    sr->ecdsa_signature.r = fp_alloc();
+    sr->ecdsa_signature.s = fp_alloc();
+
+    ecdsa_s(&sr->ecdsa_signature, bufinfo.buf, bufinfo.len, *d_fp_int, *k_fp_int, c->ecc_curve);
+
+    fp_free(d_fp_int);
+    fp_free(k_fp_int);
+
+    return MP_OBJ_FROM_PTR(sr);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_sign_obj, 4, 4, ecdsa_sign);
@@ -1691,7 +1881,7 @@ STATIC mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
     mp_ecdsa_signature_t *s = MP_OBJ_TO_PTR(signature);
     mp_point_t *q = MP_OBJ_TO_PTR(Q);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
-    return mp_obj_new_bool(ecdsa_v(&s->ecdsa_signature, bufinfo.buf, bufinfo.len, &q->ecc_point, &c->ecc_curve));
+    return mp_obj_new_bool(ecdsa_v(&s->ecdsa_signature, bufinfo.buf, bufinfo.len, q->ecc_point, c->ecc_curve));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_verify_obj, 4, 4, ecdsa_verify);
@@ -1702,16 +1892,16 @@ STATIC void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     (void)kind;
     mp_point_t *self = MP_OBJ_TO_PTR(self_in);
     vstr_t vstr_oid;
-    vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve.oid), vstr_len(&self->ecc_curve.oid));
-    vstr_t *ecc_point_x = vstr_new_from_fp((fp_int *)&self->ecc_point.x);
-    vstr_t *ecc_point_y = vstr_new_from_fp((fp_int *)&self->ecc_point.y);
-    vstr_t *ecc_curve_p = vstr_new_from_fp((fp_int *)&self->ecc_curve.p);
-    vstr_t *ecc_curve_a = vstr_new_from_fp((fp_int *)&self->ecc_curve.a);
-    vstr_t *ecc_curve_b = vstr_new_from_fp((fp_int *)&self->ecc_curve.b);
-    vstr_t *ecc_curve_q = vstr_new_from_fp((fp_int *)&self->ecc_curve.q);
-    vstr_t *ecc_curve_g_x = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.x);
-    vstr_t *ecc_curve_g_y = vstr_new_from_fp((fp_int *)&self->ecc_curve.g.y);
-    mp_printf(print, "<Point x=%s y=%s curve=<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>>", vstr_str(ecc_point_x), vstr_str(ecc_point_y), vstr_str(&self->ecc_curve.name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
+    vstr_hexlify(&vstr_oid, (const byte *)vstr_str(&self->ecc_curve->oid), vstr_len(&self->ecc_curve->oid));
+    vstr_t *ecc_point_x = vstr_new_from_fp(self->ecc_point->x);
+    vstr_t *ecc_point_y = vstr_new_from_fp(self->ecc_point->y);
+    vstr_t *ecc_curve_p = vstr_new_from_fp(self->ecc_curve->p);
+    vstr_t *ecc_curve_a = vstr_new_from_fp(self->ecc_curve->a);
+    vstr_t *ecc_curve_b = vstr_new_from_fp(self->ecc_curve->b);
+    vstr_t *ecc_curve_q = vstr_new_from_fp(self->ecc_curve->q);
+    vstr_t *ecc_curve_g_x = vstr_new_from_fp(self->ecc_curve->g->x);
+    vstr_t *ecc_curve_g_y = vstr_new_from_fp(self->ecc_curve->g->y);
+    mp_printf(print, "<Point x=%s y=%s curve=<Curve name=%s oid=%s p=%s a=%s b=%s q=%s gx=%s gy=%s>>", vstr_str(ecc_point_x), vstr_str(ecc_point_y), vstr_str(&self->ecc_curve->name), vstr_str(&vstr_oid), vstr_str(ecc_curve_p), vstr_str(ecc_curve_a), vstr_str(ecc_curve_b), vstr_str(ecc_curve_q), vstr_str(ecc_curve_g_x), vstr_str(ecc_curve_g_y));
     vstr_free(ecc_point_x);
     vstr_free(ecc_point_y);
     vstr_free(ecc_curve_p);
@@ -1734,12 +1924,12 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
         {
             if (attr == MP_QSTR_x)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_point.x);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_point->x);
                 return;
             }
             else if (attr == MP_QSTR_y)
             {
-                dest[0] = mp_obj_new_int_from_fp(&self->ecc_point.y);
+                dest[0] = mp_obj_new_int_from_fp(self->ecc_point->y);
                 return;
             }
             else if (attr == MP_QSTR_curve)
@@ -1763,25 +1953,36 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 
         if (attr == MP_QSTR_x)
         {
-            mp_fp_for_int(dest[1], &self->ecc_point.x);
+            mp_fp_for_int(dest[1], self->ecc_point->x);
         }
         else if (attr == MP_QSTR_y)
         {
-            mp_fp_for_int(dest[1], &self->ecc_point.y);
+            mp_fp_for_int(dest[1], self->ecc_point->y);
         }
         else if (attr == MP_QSTR_curve)
         {
             mp_curve_t *other = MP_OBJ_TO_PTR(dest[1]);
-            vstr_init(&self->ecc_curve.name, vstr_len(&other->ecc_curve.oid));
-            vstr_add_strn(&self->ecc_curve.name, vstr_str(&other->ecc_curve.name), vstr_len(&other->ecc_curve.name));
-            vstr_init(&self->ecc_curve.oid, vstr_len(&other->ecc_curve.oid));
-            vstr_add_strn(&self->ecc_curve.oid, vstr_str(&other->ecc_curve.oid), vstr_len(&other->ecc_curve.oid));
-            fp_copy(&other->ecc_curve.p, &self->ecc_curve.p);
-            fp_copy(&other->ecc_curve.a, &self->ecc_curve.a);
-            fp_copy(&other->ecc_curve.b, &self->ecc_curve.b);
-            fp_copy(&other->ecc_curve.q, &self->ecc_curve.q);
-            fp_copy(&other->ecc_curve.g.x, &self->ecc_curve.g.x);
-            fp_copy(&other->ecc_curve.g.y, &self->ecc_curve.g.y);
+
+            self->ecc_curve = m_new_obj(ecc_curve_t);
+            self->ecc_curve->p = fp_alloc();
+            self->ecc_curve->a = fp_alloc();
+            self->ecc_curve->b = fp_alloc();
+            self->ecc_curve->q = fp_alloc();
+            self->ecc_curve->g = m_new_obj(ecc_point_t);
+            self->ecc_curve->g->x = fp_alloc();
+            self->ecc_curve->g->y = fp_alloc();
+
+            vstr_init(&self->ecc_curve->name, vstr_len(&other->ecc_curve->oid));
+            vstr_add_strn(&self->ecc_curve->name, vstr_str(&other->ecc_curve->name), vstr_len(&other->ecc_curve->name));
+            vstr_init(&self->ecc_curve->oid, vstr_len(&other->ecc_curve->oid));
+            vstr_add_strn(&self->ecc_curve->oid, vstr_str(&other->ecc_curve->oid), vstr_len(&other->ecc_curve->oid));
+
+            fp_copy(other->ecc_curve->p, self->ecc_curve->p);
+            fp_copy(other->ecc_curve->a, self->ecc_curve->a);
+            fp_copy(other->ecc_curve->b, self->ecc_curve->b);
+            fp_copy(other->ecc_curve->q, self->ecc_curve->q);
+            fp_copy(other->ecc_curve->g->x, self->ecc_curve->g->x);
+            fp_copy(other->ecc_curve->g->y, self->ecc_curve->g->y);
         }
         else
         {
@@ -1803,13 +2004,13 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
-        if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
+        if (!ec_curve_equal(l->ecc_curve, r->ecc_curve))
         {
             mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
 
         mp_curve_t *c = new_curve_init_copy(l);
-        return point_add((mp_obj_t)l, (mp_obj_t)r, (mp_obj_t)c);
+        return point_add(MP_OBJ_FROM_PTR(l), MP_OBJ_FROM_PTR(r), MP_OBJ_FROM_PTR(c));
     }
     case MP_BINARY_OP_SUBTRACT:
     {
@@ -1819,13 +2020,13 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
-        if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
+        if (!ec_curve_equal(l->ecc_curve, r->ecc_curve))
         {
             mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
 
         mp_curve_t *c = new_curve_init_copy(l);
-        return point_sub((mp_obj_t)l, (mp_obj_t)r, (mp_obj_t)c);
+        return point_sub(MP_OBJ_FROM_PTR(l), MP_OBJ_FROM_PTR(r), MP_OBJ_FROM_PTR(c));
     }
     case MP_BINARY_OP_MULTIPLY:
 #if defined(MICROPY_PY_ALL_SPECIAL_METHODS) && defined(MICROPY_PY_REVERSE_SPECIAL_METHODS)
@@ -1842,7 +2043,7 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_curve_t *c = new_curve_init_copy(l);
-        return point_mul((mp_obj_t)l, rhs, (mp_obj_t)c);
+        return point_mul(MP_OBJ_FROM_PTR(l), rhs, MP_OBJ_FROM_PTR(c));
     }
     case MP_BINARY_OP_EQUAL:
     {
@@ -1852,11 +2053,11 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
         }
         mp_point_t *l = MP_OBJ_TO_PTR(lhs);
         mp_point_t *r = MP_OBJ_TO_PTR(rhs);
-        if (!ec_curve_equal(&l->ecc_curve, &r->ecc_curve))
+        if (!ec_curve_equal(l->ecc_curve, r->ecc_curve))
         {
             mp_raise_ValueError(ERROR_CURVE_OF_POINTS_NOT_EQUAL);
         }
-        return point_equal((mp_obj_t)l, (mp_obj_t)r);
+        return point_equal(MP_OBJ_FROM_PTR(l), MP_OBJ_FROM_PTR(r));
     }
     default:
         return MP_OBJ_NULL; // op not supported
@@ -1871,19 +2072,20 @@ STATIC mp_obj_t point_unary_op(mp_unary_op_t op, mp_obj_t self_in)
     case MP_UNARY_OP_NEGATIVE:
     {
         // copy point.y
-        fp_int point_y_fp_int;
-        fp_copy((fp_int *)&point->ecc_point.y, &point_y_fp_int);
+        fp_int *point_y_fp_int = fp_alloc();
+
+        fp_copy(point->ecc_point->y, point_y_fp_int);
 
         // -point.y % curve.p
-        fp_neg((fp_int *)&point->ecc_point.y, (fp_int *)&point->ecc_point.y);
-        fp_mod((fp_int *)&point->ecc_point.y, (fp_int *)&point->ecc_curve.p, (fp_int *)&point->ecc_point.y);
+        fp_neg(point->ecc_point->y, point->ecc_point->y);
+        fp_mod(point->ecc_point->y, point->ecc_curve->p, point->ecc_point->y);
 
         mp_point_t *pr = new_point_init_copy((mp_curve_t *)point);
 
         // restore point.y
-        fp_copy(&point_y_fp_int, (fp_int *)&point->ecc_point.y);
+        fp_copy(point_y_fp_int, point->ecc_point->y);
 
-        return (mp_obj_t)pr;
+        return MP_OBJ_FROM_PTR(pr);
     }
     default:
         return MP_OBJ_NULL; // op not supported
@@ -1925,13 +2127,17 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     mp_point_t *point = m_new_obj(mp_point_t);
     point->base.type = &point_type;
 
+    point->ecc_point = m_new_obj(ecc_point_t);
+    point->ecc_point->x = fp_alloc();
+    point->ecc_point->y = fp_alloc();
+
     if (!MP_OBJ_IS_INT(args.x.u_obj))
     {
         mp_raise_msg_varg(&mp_type_TypeError, ERROR_EXPECTED_INT_AT_BUT, mp_obj_get_type_str(args.x.u_obj), 1);
     }
     else
     {
-        mp_fp_for_int(args.x.u_obj, &point->ecc_point.x);
+        mp_fp_for_int(args.x.u_obj, point->ecc_point->x);
     }
 
     if (!MP_OBJ_IS_INT(args.y.u_obj))
@@ -1940,7 +2146,7 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     }
     else
     {
-        mp_fp_for_int(args.y.u_obj, &point->ecc_point.y);
+        mp_fp_for_int(args.y.u_obj, point->ecc_point->y);
     }
 
     if (!MP_OBJ_IS_TYPE(args.curve.u_obj, &curve_type))
@@ -1950,18 +2156,29 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     else
     {
         mp_curve_t *curve = MP_OBJ_TO_PTR(args.curve.u_obj);
-        vstr_init(&point->ecc_curve.name, vstr_len(&curve->ecc_curve.oid));
-        vstr_add_strn(&point->ecc_curve.name, vstr_str(&curve->ecc_curve.name), vstr_len(&curve->ecc_curve.name));
-        vstr_init(&point->ecc_curve.oid, vstr_len(&curve->ecc_curve.oid));
-        vstr_add_strn(&point->ecc_curve.oid, vstr_str(&curve->ecc_curve.oid), vstr_len(&curve->ecc_curve.oid));
-        fp_copy(&curve->ecc_curve.p, &point->ecc_curve.p);
-        fp_copy(&curve->ecc_curve.a, &point->ecc_curve.a);
-        fp_copy(&curve->ecc_curve.b, &point->ecc_curve.b);
-        fp_copy(&curve->ecc_curve.q, &point->ecc_curve.q);
-        fp_copy(&curve->ecc_curve.g.x, &point->ecc_curve.g.x);
-        fp_copy(&curve->ecc_curve.g.y, &point->ecc_curve.g.y);
+
+        point->ecc_curve = m_new_obj(ecc_curve_t);
+        point->ecc_curve->p = fp_alloc();
+        point->ecc_curve->a = fp_alloc();
+        point->ecc_curve->b = fp_alloc();
+        point->ecc_curve->q = fp_alloc();
+        point->ecc_curve->g = m_new_obj(ecc_point_t);
+        point->ecc_curve->g->x = fp_alloc();
+        point->ecc_curve->g->y = fp_alloc();
+
+        vstr_init(&point->ecc_curve->name, vstr_len(&curve->ecc_curve->oid));
+        vstr_add_strn(&point->ecc_curve->name, vstr_str(&curve->ecc_curve->name), vstr_len(&curve->ecc_curve->name));
+        vstr_init(&point->ecc_curve->oid, vstr_len(&curve->ecc_curve->oid));
+        vstr_add_strn(&point->ecc_curve->oid, vstr_str(&curve->ecc_curve->oid), vstr_len(&curve->ecc_curve->oid));
+
+        fp_copy(curve->ecc_curve->p, point->ecc_curve->p);
+        fp_copy(curve->ecc_curve->a, point->ecc_curve->a);
+        fp_copy(curve->ecc_curve->b, point->ecc_curve->b);
+        fp_copy(curve->ecc_curve->q, point->ecc_curve->q);
+        fp_copy(curve->ecc_curve->g->x, point->ecc_curve->g->x);
+        fp_copy(curve->ecc_curve->g->y, point->ecc_curve->g->y);
     }
-    return (mp_obj_t)point;
+    return MP_OBJ_FROM_PTR(point);
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(point_obj, 3, point);
