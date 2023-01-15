@@ -633,7 +633,7 @@ typedef struct _mp_point_t
 typedef struct _mp_ecdsa_signature_t
 {
     mp_obj_base_t base;
-    ecdsa_signature_t ecdsa_signature;
+    ecdsa_signature_t *ecdsa_signature;
 } mp_ecdsa_signature_t;
 
 const mp_obj_type_t signature_type;
@@ -719,8 +719,8 @@ STATIC void signature_print(mp_print_t *print, mp_obj_t self_in, mp_print_kind_t
 {
     (void)kind;
     mp_ecdsa_signature_t *self = MP_OBJ_TO_PTR(self_in);
-    vstr_t *vstr_r = vstr_new_from_fp(self->ecdsa_signature.r);
-    vstr_t *vstr_s = vstr_new_from_fp(self->ecdsa_signature.s);
+    vstr_t *vstr_r = vstr_new_from_fp(self->ecdsa_signature->r);
+    vstr_t *vstr_s = vstr_new_from_fp(self->ecdsa_signature->s);
     mp_printf(print, "<Signature r=%s s=%s>", vstr_str(vstr_r), vstr_str(vstr_s));
     vstr_free(vstr_r);
     vstr_free(vstr_s);
@@ -738,7 +738,7 @@ STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rh
         }
         mp_ecdsa_signature_t *l = MP_OBJ_TO_PTR(lhs);
         mp_ecdsa_signature_t *r = MP_OBJ_TO_PTR(rhs);
-        return mp_obj_new_bool(ec_signature_equal(&l->ecdsa_signature, &r->ecdsa_signature));
+        return mp_obj_new_bool(ec_signature_equal(l->ecdsa_signature, r->ecdsa_signature));
     }
     default:
         return MP_OBJ_NULL; // op not supported
@@ -757,12 +757,12 @@ STATIC void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
         {
             if (attr == MP_QSTR_r)
             {
-                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature.r);
+                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature->r);
                 return;
             }
             else if (attr == MP_QSTR_s)
             {
-                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature.s);
+                dest[0] = mp_obj_new_int_from_fp(self->ecdsa_signature->s);
                 return;
             }
             mp_convert_member_lookup(obj, type, elem->value, dest);
@@ -1795,11 +1795,12 @@ STATIC mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *
         }
     }
 
-    signature->ecdsa_signature.r = fp_alloc();
-    signature->ecdsa_signature.s = fp_alloc();
+    signature->ecdsa_signature = m_new_obj(ecdsa_signature_t);
+    signature->ecdsa_signature->r = fp_alloc();
+    signature->ecdsa_signature->s = fp_alloc();
 
-    mp_fp_for_int(args.r.u_obj, signature->ecdsa_signature.r);
-    mp_fp_for_int(args.s.u_obj, signature->ecdsa_signature.s);
+    mp_fp_for_int(args.r.u_obj, signature->ecdsa_signature->r);
+    mp_fp_for_int(args.s.u_obj, signature->ecdsa_signature->s);
 
     return MP_OBJ_FROM_PTR(signature);
 }
@@ -1841,10 +1842,11 @@ STATIC mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
     mp_ecdsa_signature_t *sr = m_new_obj(mp_ecdsa_signature_t);
     sr->base.type = &signature_type;
 
-    sr->ecdsa_signature.r = fp_alloc();
-    sr->ecdsa_signature.s = fp_alloc();
+    sr->ecdsa_signature = m_new_obj(ecdsa_signature_t);
+    sr->ecdsa_signature->r = fp_alloc();
+    sr->ecdsa_signature->s = fp_alloc();
 
-    ecdsa_s(&sr->ecdsa_signature, bufinfo.buf, bufinfo.len, *d_fp_int, *k_fp_int, c->ecc_curve);
+    ecdsa_s(sr->ecdsa_signature, bufinfo.buf, bufinfo.len, *d_fp_int, *k_fp_int, c->ecc_curve);
 
     fp_free(d_fp_int);
     fp_free(k_fp_int);
@@ -1881,7 +1883,7 @@ STATIC mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
     mp_ecdsa_signature_t *s = MP_OBJ_TO_PTR(signature);
     mp_point_t *q = MP_OBJ_TO_PTR(Q);
     mp_curve_t *c = MP_OBJ_TO_PTR(curve);
-    return mp_obj_new_bool(ecdsa_v(&s->ecdsa_signature, bufinfo.buf, bufinfo.len, q->ecc_point, c->ecc_curve));
+    return mp_obj_new_bool(ecdsa_v(s->ecdsa_signature, bufinfo.buf, bufinfo.len, q->ecc_point, c->ecc_curve));
 }
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_verify_obj, 4, 4, ecdsa_verify);
