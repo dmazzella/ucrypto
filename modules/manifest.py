@@ -13,6 +13,8 @@ freeze(
         "ufastrsa/rsa.py",
         "ufastrsa/srandom.py",
         "ufastrsa/util.py",
+        "uasn1/__init__.py",
+        "contextlib.py",
         "functools.py",
         "hmac.py",
     ),
