@@ -152,7 +152,7 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
     ➜  ~ cd micropython
     ➜  micropython (master) ✗ git submodule update --init
     ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto
-    ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/esp32/ BOARD="ESP32_GENERIC" USER_C_MODULES="$(pwd)/ports/esp32 boards/ESP32_GENERIC/cmodules/ucrypto/micropython.cmake"
+    ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/esp32/ BOARD="ESP32_GENERIC" USER_C_MODULES="$(pwd)/ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto/micropython.cmake"
     ```
 
 ## Build size:
