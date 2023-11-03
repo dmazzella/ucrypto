@@ -146,6 +146,18 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
     ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/stm32/ BOARD="PYBD_SF6" USER_C_MODULES="$(pwd)/ports/stm32/boards/PYBD_SF6/cmodules"
     ```
 
+- Note: if build fails with an output like below, point ```USER_C_MODULES``` at `"$(pwd)/ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto/micropython.cmake"`:
+```bash
+  Including User C Module(s) from /home/your-username/micropython/ports/esp32/boards/ESP32_GENERIC/cmodules
+CMake Error at /home/your-username/micropython/py/usermod.cmake:42 (include):
+  include could not find load file:
+
+    /home/your-username/micropython/ports/esp32/boards/ESP32_GENERIC/cmodules
+Call Stack (most recent call first):
+  esp32_common.cmake:22 (include)
+  main_esp32/CMakeLists.txt:11 (include)
+  ```
+
 ## Build size:
 
 The build size depends on the asm optimizations of the tomsfastmath library that are enabled into ```ucrypto/tomsfastmath/tfm_mpi.h```
