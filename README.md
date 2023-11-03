@@ -138,12 +138,21 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
 
 
 - Example:
+    ### PYBD_SF6
     ```bash
     ➜  ~ git clone https://github.com/micropython/micropython.git micropython
     ➜  ~ cd micropython
     ➜  micropython (master) ✗ git submodule update --init
     ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/stm32/boards/PYBD_SF6/cmodules/ucrypto
     ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/stm32/ BOARD="PYBD_SF6" USER_C_MODULES="$(pwd)/ports/stm32/boards/PYBD_SF6/cmodules"
+    ```
+    ### ESP32_GENERIC
+    ```bash
+    ➜  ~ git clone https://github.com/micropython/micropython.git micropython
+    ➜  ~ cd micropython
+    ➜  micropython (master) ✗ git submodule update --init
+    ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto
+    ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/esp32/ BOARD="ESP32_GENERIC" USER_C_MODULES="$(pwd)/ports/esp32 boards/ESP32_GENERIC/cmodules/micropython.cmake"
     ```
 
 ## Build size:
