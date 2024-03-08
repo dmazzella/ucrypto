@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019-2023 Damiano Mazzella
+ * Copyright (c) 2019-2024 Damiano Mazzella
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -66,7 +66,7 @@
 #define ERROR_RIGHT_EXPECTED_INT MP_ERROR_TEXT("right must be a int")
 #define ERROR_MEMORY MP_ERROR_TEXT("memory allocation failed, allocating %u bytes")
 
-STATIC vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
+static vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
 {
     if ((in_len & 1) != 0)
     {
@@ -101,7 +101,7 @@ STATIC vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
     return vstr_out;
 }
 
-STATIC vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
+static vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
 {
     vstr_init(vstr_out, in_len);
 
@@ -127,14 +127,14 @@ STATIC vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
     return vstr_out;
 }
 
-STATIC fp_int *fp_alloc(void)
+static fp_int *fp_alloc(void)
 {
     fp_int *a = m_new_obj(fp_int);
     fp_init(a);
     return a;
 }
 
-STATIC void fp_free(fp_int *a)
+static void fp_free(fp_int *a)
 {
     if (a != NULL)
     {
@@ -142,7 +142,7 @@ STATIC void fp_free(fp_int *a)
     }
 }
 
-STATIC mp_obj_t fp_int_as_int(fp_int *b)
+static mp_obj_t fp_int_as_int(fp_int *b)
 {
     mp_obj_int_t *o = mp_obj_int_new_mpz();
     mpz_init_zero(&o->mpz);
@@ -185,7 +185,7 @@ STATIC mp_obj_t fp_int_as_int(fp_int *b)
     return MP_OBJ_FROM_PTR(o);
 }
 
-STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
+static size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
 {
     /* set the integer to the default of zero */
     fp_zero(b);
@@ -233,7 +233,7 @@ STATIC size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
     return FP_OKAY;
 }
 
-STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
+static mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
 {
     if (MP_OBJ_IS_SMALL_INT(arg))
     {
@@ -247,7 +247,7 @@ STATIC mpz_t *mp_mpz_for_int(mp_obj_t arg, mpz_t *temp)
     }
 }
 
-STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
+static bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
 {
     mpz_t arp_temp;
     mpz_t *arp_p = mp_mpz_for_int(arg, &arp_temp);
@@ -260,7 +260,7 @@ STATIC bool mp_fp_for_int(mp_obj_t arg, fp_int *ft_tmp)
 }
 
 #if 0
-STATIC vstr_t *vstr_new_from_mpz(const mpz_t *i)
+static vstr_t *vstr_new_from_mpz(const mpz_t *i)
 {
     size_t len = mp_int_format_size(mpz_max_num_bits(i), 10, NULL, '\0');
     vstr_t *vstr = vstr_new(len);
@@ -270,7 +270,7 @@ STATIC vstr_t *vstr_new_from_mpz(const mpz_t *i)
 }
 #endif
 
-STATIC vstr_t *vstr_new_from_fp(fp_int *fp)
+static vstr_t *vstr_new_from_fp(fp_int *fp)
 {
     int size_fp;
     fp_radix_size(fp, 10, &size_fp);
@@ -280,13 +280,13 @@ STATIC vstr_t *vstr_new_from_fp(fp_int *fp)
     return vstr_fp;
 }
 
-STATIC mp_obj_t mp_obj_new_int_from_fp(fp_int *fp)
+static mp_obj_t mp_obj_new_int_from_fp(fp_int *fp)
 {
     return fp_int_as_int(fp);
 }
 
 /* returns a TFM ident string useful for debugging... */
-STATIC mp_obj_t mod_ident(void)
+static mp_obj_t mod_ident(void)
 {
     const char *s = fp_ident();
     size_t s_len = strlen(s);
@@ -296,8 +296,8 @@ STATIC mp_obj_t mod_ident(void)
     return mp_obj_new_str_from_vstr(&vstr_out);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mod_ident_obj, mod_ident);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_ident_obj, MP_ROM_PTR(&mod_ident_obj));
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_ident_obj, mod_ident);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_ident_obj, MP_ROM_PTR(&mod_ident_obj));
 
 static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
 {
@@ -340,7 +340,7 @@ static int fp_pow3(fp_int *X, fp_int *E, fp_int *M, fp_int *Y)
     return FP_OKAY;
 }
 
-STATIC mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
+static mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
 {
     fp_int *a_fp_int = fp_alloc();
     fp_int *b_fp_int = fp_alloc();
@@ -363,11 +363,11 @@ STATIC mp_obj_t mod_fast_pow(mp_obj_t A_in, mp_obj_t B_in, mp_obj_t C_in)
     return res;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(mod_fast_pow_obj, mod_fast_pow);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_fast_pow_obj, MP_ROM_PTR(&mod_fast_pow_obj));
+static MP_DEFINE_CONST_FUN_OBJ_3(mod_fast_pow_obj, mod_fast_pow);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_fast_pow_obj, MP_ROM_PTR(&mod_fast_pow_obj));
 
 /* d = a**b (mod c) */
-STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_a, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -418,11 +418,11 @@ STATIC mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t
     return res;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_exptmod_obj, 3, mod_exptmod);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_exptmod_obj, MP_ROM_PTR(&mod_exptmod_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(mod_exptmod_obj, 3, mod_exptmod);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_exptmod_obj, MP_ROM_PTR(&mod_exptmod_obj));
 
 /* c = 1/a (mod b) */
-STATIC mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
+static mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
 {
     fp_int *a_fp_int = fp_alloc();
     fp_int *b_fp_int = fp_alloc();
@@ -441,11 +441,11 @@ STATIC mp_obj_t mod_invmod(mp_obj_t A_in, mp_obj_t B_in)
     return res;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_invmod_obj, mod_invmod);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_invmod_obj, MP_ROM_PTR(&mod_invmod_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(mod_invmod_obj, mod_invmod);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_invmod_obj, MP_ROM_PTR(&mod_invmod_obj));
 
 /* c = (a, b) */
-STATIC mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
+static mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
 {
     fp_int *a_fp_int = fp_alloc();
     fp_int *b_fp_int = fp_alloc();
@@ -465,10 +465,10 @@ STATIC mp_obj_t mod_gcd(mp_obj_t A_in, mp_obj_t B_in)
     return res;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(mod_gcd_obj, mod_gcd);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_gcd_obj, MP_ROM_PTR(&mod_gcd_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(mod_gcd_obj, mod_gcd);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_gcd_obj, MP_ROM_PTR(&mod_gcd_obj));
 
-STATIC int ucrypto_rng(unsigned char *dst, int len, void *dat)
+static int ucrypto_rng(unsigned char *dst, int len, void *dat)
 {
     (void)dat;
     for (int x = 0; x < len; x++)
@@ -495,7 +495,7 @@ void free(void *ptr)
 #endif
 #endif
 
-STATIC mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_num, MP_ARG_INT, {.u_int = 1024}},
@@ -533,10 +533,10 @@ STATIC mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, m
     return mp_obj_new_int_from_fp(&a_fp_int);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_generate_prime_obj, 1, mod_generate_prime);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_generate_prime_obj, MP_ROM_PTR(&mod_generate_prime_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(mod_generate_prime_obj, 1, mod_generate_prime);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_generate_prime_obj, MP_ROM_PTR(&mod_generate_prime_obj));
 
-STATIC mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_a, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -564,16 +564,16 @@ STATIC mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_
     return mp_obj_new_bool(ret);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mod_is_prime_obj, 1, mod_is_prime);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_is_prime_obj, MP_ROM_PTR(&mod_is_prime_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(mod_is_prime_obj, 1, mod_is_prime);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_is_prime_obj, MP_ROM_PTR(&mod_is_prime_obj));
 
-STATIC void number_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void number_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_printf(print, mp_obj_get_type_str(self_in));
 }
 
-STATIC const mp_rom_map_elem_t number_locals_dict_table[] = {
+static const mp_rom_map_elem_t number_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_ident), MP_ROM_PTR(&mod_static_ident_obj)},
     {MP_ROM_QSTR(MP_QSTR_exptmod), MP_ROM_PTR(&mod_static_exptmod_obj)},
     {MP_ROM_QSTR(MP_QSTR_fast_pow), MP_ROM_PTR(&mod_static_fast_pow_obj)},
@@ -583,7 +583,7 @@ STATIC const mp_rom_map_elem_t number_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_is_prime), MP_ROM_PTR(&mod_static_is_prime_obj)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(number_locals_dict, number_locals_dict_table);
+static MP_DEFINE_CONST_DICT(number_locals_dict, number_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     number_type,
@@ -641,7 +641,7 @@ const mp_obj_type_t curve_type;
 const mp_obj_type_t point_type;
 const mp_obj_type_t ecc_type;
 
-STATIC mp_curve_t *new_curve_init_copy(mp_point_t *point)
+static mp_curve_t *new_curve_init_copy(mp_point_t *point)
 {
     mp_curve_t *c = m_new_obj(mp_curve_t);
     c->base.type = &curve_type;
@@ -669,7 +669,7 @@ STATIC mp_curve_t *new_curve_init_copy(mp_point_t *point)
     return c;
 }
 
-STATIC mp_point_t *new_point_init_copy(mp_curve_t *curve)
+static mp_point_t *new_point_init_copy(mp_curve_t *curve)
 {
     mp_point_t *pr = m_new_obj(mp_point_t);
     pr->base.type = &point_type;
@@ -702,7 +702,7 @@ STATIC mp_point_t *new_point_init_copy(mp_curve_t *curve)
     return pr;
 }
 
-STATIC bool ec_signature_equal(ecdsa_signature_t *s1, ecdsa_signature_t *s2)
+static bool ec_signature_equal(ecdsa_signature_t *s1, ecdsa_signature_t *s2)
 {
     if (fp_cmp(s1->r, s2->r) != FP_EQ)
     {
@@ -715,7 +715,7 @@ STATIC bool ec_signature_equal(ecdsa_signature_t *s1, ecdsa_signature_t *s2)
     return true;
 }
 
-STATIC void signature_print(mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void signature_print(mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_ecdsa_signature_t *self = MP_OBJ_TO_PTR(self_in);
@@ -726,7 +726,7 @@ STATIC void signature_print(mp_print_t *print, mp_obj_t self_in, mp_print_kind_t
     vstr_free(vstr_s);
 }
 
-STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
+static mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
 {
     switch (op)
     {
@@ -745,7 +745,7 @@ STATIC mp_obj_t signature_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rh
     }
 }
 
-STATIC void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
+static void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 {
     mp_ecdsa_signature_t *self = MP_OBJ_TO_PTR(obj);
     if (dest[0] == MP_OBJ_NULL)
@@ -770,12 +770,12 @@ STATIC void signature_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     }
 }
 
-STATIC const mp_rom_map_elem_t signature_locals_dict_table[] = {
+static const mp_rom_map_elem_t signature_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_s), MP_ROM_INT(0)},
     {MP_ROM_QSTR(MP_QSTR_r), MP_ROM_INT(0)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(signature_locals_dict, signature_locals_dict_table);
+static MP_DEFINE_CONST_DICT(signature_locals_dict, signature_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     signature_type,
@@ -786,7 +786,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, signature_attr,
     locals_dict, &signature_locals_dict);
 
-STATIC bool ec_point_in_curve(ecc_point_t *point, ecc_curve_t *curve)
+static bool ec_point_in_curve(ecc_point_t *point, ecc_curve_t *curve)
 {
     int is_point_in_curve = 0;
     fp_int *x = fp_alloc();
@@ -835,7 +835,7 @@ STATIC bool ec_point_in_curve(ecc_point_t *point, ecc_curve_t *curve)
     return is_point_in_curve;
 }
 
-STATIC bool ec_curve_equal(ecc_curve_t *c1, ecc_curve_t *c2)
+static bool ec_curve_equal(ecc_curve_t *c1, ecc_curve_t *c2)
 {
     if (fp_cmp(c1->p, c2->p) != FP_EQ)
     {
@@ -864,7 +864,7 @@ STATIC bool ec_curve_equal(ecc_curve_t *c1, ecc_curve_t *c2)
     return true;
 }
 
-STATIC mp_obj_t curve_equal(mp_obj_t curve1, mp_obj_t curve2)
+static mp_obj_t curve_equal(mp_obj_t curve1, mp_obj_t curve2)
 {
     if (!MP_OBJ_IS_TYPE(curve1, &curve_type))
     {
@@ -880,10 +880,10 @@ STATIC mp_obj_t curve_equal(mp_obj_t curve1, mp_obj_t curve2)
     return mp_obj_new_bool(ec_curve_equal(c1->ecc_curve, c2->ecc_curve));
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(curve_equal_obj, curve_equal);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_curve_equal_obj, MP_ROM_PTR(&curve_equal_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(curve_equal_obj, curve_equal);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_curve_equal_obj, MP_ROM_PTR(&curve_equal_obj));
 
-STATIC mp_obj_t point_in_curve(mp_obj_t point, mp_obj_t curve)
+static mp_obj_t point_in_curve(mp_obj_t point, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
@@ -899,10 +899,10 @@ STATIC mp_obj_t point_in_curve(mp_obj_t point, mp_obj_t curve)
     return mp_obj_new_bool(ec_point_in_curve(p->ecc_point, c->ecc_curve));
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_in_curve_obj, point_in_curve);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_in_curve_obj, MP_ROM_PTR(&point_in_curve_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(point_in_curve_obj, point_in_curve);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_in_curve_obj, MP_ROM_PTR(&point_in_curve_obj));
 
-STATIC void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_curve_t *self = MP_OBJ_TO_PTR(self_in);
@@ -923,7 +923,7 @@ STATIC void curve_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     vstr_free(ecc_curve_g_y);
 }
 
-STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
+static mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
 {
     switch (op)
     {
@@ -956,7 +956,7 @@ STATIC mp_obj_t curve_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     }
 }
 
-STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
+static void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 {
     mp_curve_t *self = MP_OBJ_TO_PTR(obj);
     if (dest[0] == MP_OBJ_NULL)
@@ -1104,7 +1104,7 @@ STATIC void curve_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     }
 }
 
-STATIC const mp_rom_map_elem_t curve_locals_dict_table[] = {
+static const mp_rom_map_elem_t curve_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_p), MP_ROM_INT(0)},
     {MP_ROM_QSTR(MP_QSTR_a), MP_ROM_INT(0)},
     {MP_ROM_QSTR(MP_QSTR_b), MP_ROM_INT(0)},
@@ -1116,7 +1116,7 @@ STATIC const mp_rom_map_elem_t curve_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_oid), MP_ROM_PTR(mp_const_none)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(curve_locals_dict, curve_locals_dict_table);
+static MP_DEFINE_CONST_DICT(curve_locals_dict, curve_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     curve_type,
@@ -1127,7 +1127,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, curve_attr,
     locals_dict, &curve_locals_dict);
 
-STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     /*
         Currently only curves in Weierstrass form (y^2 = x^3 + ax + b (mod p))
@@ -1227,12 +1227,12 @@ STATIC mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     return MP_OBJ_FROM_PTR(curve);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(curve_obj, 6, curve);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_curve_obj, MP_ROM_PTR(&curve_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(curve_obj, 6, curve);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_curve_obj, MP_ROM_PTR(&curve_obj));
 
 ///////////////////////////////////// Point ////////////////////////////////////
 
-STATIC bool ec_point_equal(ecc_point_t *p1, ecc_point_t *p2)
+static bool ec_point_equal(ecc_point_t *p1, ecc_point_t *p2)
 {
     // check x coords
     if (fp_cmp(p1->x, p2->x) != FP_EQ)
@@ -1247,7 +1247,7 @@ STATIC bool ec_point_equal(ecc_point_t *p1, ecc_point_t *p2)
     return true;
 }
 
-STATIC void ec_point_double(ecc_point_t *rop, ecc_point_t *op, ecc_curve_t *curve)
+static void ec_point_double(ecc_point_t *rop, ecc_point_t *op, ecc_curve_t *curve)
 {
     if (fp_cmp_d(op->x, 0) == FP_EQ && fp_cmp_d(op->y, 0) == FP_EQ)
     {
@@ -1298,7 +1298,7 @@ STATIC void ec_point_double(ecc_point_t *rop, ecc_point_t *op, ecc_curve_t *curv
     fp_free(lambda);
 }
 
-STATIC void ec_point_add(ecc_point_t *rop, ecc_point_t *op1, ecc_point_t *op2, ecc_curve_t *curve)
+static void ec_point_add(ecc_point_t *rop, ecc_point_t *op1, ecc_point_t *op2, ecc_curve_t *curve)
 {
     // handle the identity element
     if (fp_cmp_d(op1->x, 0) == FP_EQ && fp_cmp_d(op1->y, 0) == FP_EQ && fp_cmp_d(op2->x, 0) == FP_EQ && fp_cmp_d(op2->y, 0) == FP_EQ)
@@ -1368,7 +1368,7 @@ STATIC void ec_point_add(ecc_point_t *rop, ecc_point_t *op1, ecc_point_t *op2, e
     fp_free(negy);
 }
 
-STATIC void ec_point_mul(ecc_point_t *rop, ecc_point_t *point, fp_int scalar, ecc_curve_t *curve)
+static void ec_point_mul(ecc_point_t *rop, ecc_point_t *point, fp_int scalar, ecc_curve_t *curve)
 {
     // handle the identity element
     if (fp_cmp_d(point->x, 0) == FP_EQ && fp_cmp_d(point->y, 0) == FP_EQ)
@@ -1474,7 +1474,7 @@ STATIC void ec_point_mul(ecc_point_t *rop, ecc_point_t *point, fp_int scalar, ec
     m_del_obj(ecc_point_t, tmp);
 }
 
-STATIC void ec_point_shamirs_trick(ecc_point_t *rop, ecc_point_t *point1, fp_int scalar1, ecc_point_t *point2, fp_int scalar2, ecc_curve_t *curve)
+static void ec_point_shamirs_trick(ecc_point_t *rop, ecc_point_t *point1, fp_int scalar1, ecc_point_t *point2, fp_int scalar2, ecc_curve_t *curve)
 {
     ecc_point_t *sum = m_new_obj(ecc_point_t);
     sum->x = fp_alloc();
@@ -1539,7 +1539,7 @@ STATIC void ec_point_shamirs_trick(ecc_point_t *rop, ecc_point_t *point1, fp_int
     m_del_obj(ecc_point_t, tmp);
 }
 
-STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, fp_int d, fp_int k, ecc_curve_t *curve)
+static void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, fp_int d, fp_int k, ecc_curve_t *curve)
 {
     fp_int *e = fp_alloc();
     fp_int *kinv = fp_alloc();
@@ -1584,7 +1584,7 @@ STATIC void ecdsa_s(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, 
     m_del_obj(ecc_point_t, R);
 }
 
-STATIC int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, ecc_point_t *Q, ecc_curve_t *curve)
+static int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, ecc_point_t *Q, ecc_curve_t *curve)
 {
     fp_int *e = fp_alloc();
     fp_int *w = fp_alloc();
@@ -1631,7 +1631,7 @@ STATIC int ecdsa_v(ecdsa_signature_t *sig, unsigned char *msg, size_t msg_len, e
     return equal;
 }
 
-STATIC mp_obj_t point_equal(mp_obj_t point1, mp_obj_t point2)
+static mp_obj_t point_equal(mp_obj_t point1, mp_obj_t point2)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
@@ -1647,10 +1647,10 @@ STATIC mp_obj_t point_equal(mp_obj_t point1, mp_obj_t point2)
     return mp_obj_new_bool(ec_point_equal(p1->ecc_point, p2->ecc_point));
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_equal_obj, point_equal);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_equal_obj, MP_ROM_PTR(&point_equal_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(point_equal_obj, point_equal);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_equal_obj, MP_ROM_PTR(&point_equal_obj));
 
-STATIC mp_obj_t point_double(mp_obj_t point, mp_obj_t curve)
+static mp_obj_t point_double(mp_obj_t point, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
@@ -1669,10 +1669,10 @@ STATIC mp_obj_t point_double(mp_obj_t point, mp_obj_t curve)
     return MP_OBJ_FROM_PTR(pr);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(point_double_obj, point_double);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_double_obj, MP_ROM_PTR(&point_double_obj));
+static MP_DEFINE_CONST_FUN_OBJ_2(point_double_obj, point_double);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_double_obj, MP_ROM_PTR(&point_double_obj));
 
-STATIC mp_obj_t point_add(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
+static mp_obj_t point_add(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
@@ -1696,10 +1696,10 @@ STATIC mp_obj_t point_add(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
     return MP_OBJ_FROM_PTR(pr);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_add_obj, point_add);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_add_obj, MP_ROM_PTR(&point_add_obj));
+static MP_DEFINE_CONST_FUN_OBJ_3(point_add_obj, point_add);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_add_obj, MP_ROM_PTR(&point_add_obj));
 
-STATIC mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
+static mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point1, &point_type))
     {
@@ -1737,10 +1737,10 @@ STATIC mp_obj_t point_sub(mp_obj_t point1, mp_obj_t point2, mp_obj_t curve)
     return MP_OBJ_FROM_PTR(pr);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_sub_obj, point_sub);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_sub_obj, MP_ROM_PTR(&point_sub_obj));
+static MP_DEFINE_CONST_FUN_OBJ_3(point_sub_obj, point_sub);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_sub_obj, MP_ROM_PTR(&point_sub_obj));
 
-STATIC mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
+static mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
 {
     if (!MP_OBJ_IS_TYPE(point, &point_type))
     {
@@ -1770,10 +1770,10 @@ STATIC mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
     return MP_OBJ_FROM_PTR(pr);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(point_mul_obj, point_mul);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_mul_obj, MP_ROM_PTR(&point_mul_obj));
+static MP_DEFINE_CONST_FUN_OBJ_3(point_mul_obj, point_mul);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_mul_obj, MP_ROM_PTR(&point_mul_obj));
 
-STATIC mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_r, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -1805,10 +1805,10 @@ STATIC mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *
     return MP_OBJ_FROM_PTR(signature);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(signature_obj, 2, signature);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_signature_obj, MP_ROM_PTR(&signature_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(signature_obj, 2, signature);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_signature_obj, MP_ROM_PTR(&signature_obj));
 
-STATIC mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
+static mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
 {
     (void)n_args;
     mp_obj_t msg = args[0];
@@ -1854,10 +1854,10 @@ STATIC mp_obj_t ecdsa_sign(size_t n_args, const mp_obj_t *args)
     return MP_OBJ_FROM_PTR(sr);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_sign_obj, 4, 4, ecdsa_sign);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_ecdsa_sign_obj, MP_ROM_PTR(&ecdsa_sign_obj));
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_sign_obj, 4, 4, ecdsa_sign);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_ecdsa_sign_obj, MP_ROM_PTR(&ecdsa_sign_obj));
 
-STATIC mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
+static mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
 {
     (void)n_args;
     mp_obj_t signature = args[0];
@@ -1886,10 +1886,10 @@ STATIC mp_obj_t ecdsa_verify(size_t n_args, const mp_obj_t *args)
     return mp_obj_new_bool(ecdsa_v(s->ecdsa_signature, bufinfo.buf, bufinfo.len, q->ecc_point, c->ecc_curve));
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_verify_obj, 4, 4, ecdsa_verify);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_ecdsa_verify_obj, MP_ROM_PTR(&ecdsa_verify_obj));
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ecdsa_verify_obj, 4, 4, ecdsa_verify);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_ecdsa_verify_obj, MP_ROM_PTR(&ecdsa_verify_obj));
 
-STATIC void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_point_t *self = MP_OBJ_TO_PTR(self_in);
@@ -1914,7 +1914,7 @@ STATIC void point_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind
     vstr_free(ecc_curve_g_y);
 }
 
-STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
+static void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
 {
     mp_point_t *self = MP_OBJ_TO_PTR(obj);
     if (dest[0] == MP_OBJ_NULL)
@@ -1994,7 +1994,7 @@ STATIC void point_attr(mp_obj_t obj, qstr attr, mp_obj_t *dest)
     }
 }
 
-STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
+static mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
 {
     switch (op)
     {
@@ -2066,7 +2066,7 @@ STATIC mp_obj_t point_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs)
     }
 }
 
-STATIC mp_obj_t point_unary_op(mp_unary_op_t op, mp_obj_t self_in)
+static mp_obj_t point_unary_op(mp_unary_op_t op, mp_obj_t self_in)
 {
     mp_point_t *point = MP_OBJ_TO_PTR(self_in);
     switch (op)
@@ -2094,13 +2094,13 @@ STATIC mp_obj_t point_unary_op(mp_unary_op_t op, mp_obj_t self_in)
     }
 }
 
-STATIC const mp_rom_map_elem_t point_locals_dict_table[] = {
+static const mp_rom_map_elem_t point_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_x), MP_ROM_INT(0)},
     {MP_ROM_QSTR(MP_QSTR_y), MP_ROM_INT(0)},
     {MP_ROM_QSTR(MP_QSTR_curve), MP_ROM_PTR(mp_const_none)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(point_locals_dict, point_locals_dict_table);
+static MP_DEFINE_CONST_DICT(point_locals_dict, point_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     point_type,
@@ -2112,7 +2112,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, point_attr,
     locals_dict, &point_locals_dict);
 
-STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_x, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -2183,16 +2183,16 @@ STATIC mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_a
     return MP_OBJ_FROM_PTR(point);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_KW(point_obj, 3, point);
-STATIC MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_obj, MP_ROM_PTR(&point_obj));
+static MP_DEFINE_CONST_FUN_OBJ_KW(point_obj, 3, point);
+static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_obj, MP_ROM_PTR(&point_obj));
 
-STATIC void ecc_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+static void ecc_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
     (void)kind;
     mp_printf(print, mp_obj_get_type_str(self_in));
 }
 
-STATIC const mp_rom_map_elem_t ecc_locals_dict_table[] = {
+static const mp_rom_map_elem_t ecc_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_Point), MP_ROM_PTR(&static_point_obj)},
     {MP_ROM_QSTR(MP_QSTR_point_equal), MP_ROM_PTR(&static_point_equal_obj)},
     {MP_ROM_QSTR(MP_QSTR_point_double), MP_ROM_PTR(&static_point_double_obj)},
@@ -2207,7 +2207,7 @@ STATIC const mp_rom_map_elem_t ecc_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_ecdsa_verify), MP_ROM_PTR(&static_ecdsa_verify_obj)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(ecc_locals_dict, ecc_locals_dict_table);
+static MP_DEFINE_CONST_DICT(ecc_locals_dict, ecc_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     ecc_type,
@@ -2216,13 +2216,13 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, ecc_print,
     locals_dict, &ecc_locals_dict);
 
-STATIC const mp_rom_map_elem_t mp_module_ucrypto_globals_table[] = {
+static const mp_rom_map_elem_t mp_module_ucrypto_globals_table[] = {
     {MP_OBJ_NEW_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR__crypto)},
     {MP_ROM_QSTR(MP_QSTR_ECC), MP_ROM_PTR(&ecc_type)},
     {MP_ROM_QSTR(MP_QSTR_NUMBER), MP_ROM_PTR(&number_type)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_ucrypto_globals, mp_module_ucrypto_globals_table);
+static MP_DEFINE_CONST_DICT(mp_module_ucrypto_globals, mp_module_ucrypto_globals_table);
 
 const mp_obj_module_t mp_module_ucrypto = {
     .base = {&mp_type_module},
