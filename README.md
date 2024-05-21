@@ -4,7 +4,7 @@
 ECDSA API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).**
 
 > [!TIP]
-> If you find **ucryptography** useful, consider :star: this project
+> If you find **ucrypto** useful, consider :star: this project
 > and why not ... [Buy me a coffee](https://www.buymeacoffee.com/damianomazp) :smile:
 
 ## Examples
