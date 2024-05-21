@@ -3,6 +3,10 @@
 **Micropython package for doing fast rsa and elliptic curve cryptography, specifically digital signatures.
 ECDSA API design inspired from [fastecdsa](https://github.com/AntonKueltz/fastecdsa) and implementation based on [tomsfastmath](https://github.com/libtom/tomsfastmath).**
 
+> [!TIP]
+> If you find **ucryptography** useful, consider :star: this project
+> and why not ... [Buy me a coffee](https://www.buymeacoffee.com/damianomazp) :smile:
+
 ## Examples
 
 - Signing and Verifying **ufastrsa**
