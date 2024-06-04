@@ -158,6 +158,14 @@ To build such a module, compile MicroPython with an extra make flag named ```USE
     ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto
     ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/esp32/ BOARD="ESP32_GENERIC" USER_C_MODULES="$(pwd)/ports/esp32/boards/ESP32_GENERIC/cmodules/ucrypto/micropython.cmake"
     ```
+    ### ARDUINO_NANO_RP2040_CONNECT
+    ```bash
+    ➜  ~ git clone https://github.com/micropython/micropython.git micropython
+    ➜  ~ cd micropython
+    ➜  micropython (master) ✗ git submodule update --init
+    ➜  micropython (master) ✗ git clone https://github.com/dmazzella/ucrypto.git ports/rp2/boards/ARDUINO_NANO_RP2040_CONNECT/cmodules/ucrypto
+    ➜  micropython (master) ✗ make -j8 -C mpy-cross && make -j8 -C ports/rp2/ BOARD="ARDUINO_NANO_RP2040_CONNECT" USER_C_MODULES="$(pwd)/ports/rp2/boards/ARDUINO_NANO_RP2040_CONNECT/cmodules/ucrypto/micropython.cmake"
+    ```
 
 ## Build size:
 
