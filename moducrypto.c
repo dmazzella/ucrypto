@@ -76,7 +76,7 @@ static vstr_t *vstr_unhexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
     vstr_init_len(vstr_out, in_len / 2);
     byte *out = (byte *)vstr_str(vstr_out);
     byte hex_byte = 0;
-    for (mp_uint_t i = in_len; i--;)
+    for (size_t i = in_len; i--;)
     {
         byte hex_ch = *in++;
         if (unichar_isxdigit(hex_ch))
@@ -107,7 +107,7 @@ static vstr_t *vstr_hexlify(vstr_t *vstr_out, const byte *in, size_t in_len)
 
     if (in != NULL && in_len)
     {
-        for (mp_uint_t i = in_len; i--;)
+        for (size_t i = in_len; i--;)
         {
             byte d = (*in >> 4);
             if (d > 9)
@@ -367,7 +367,7 @@ static MP_DEFINE_CONST_FUN_OBJ_3(mod_fast_pow_obj, mod_fast_pow);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_fast_pow_obj, MP_ROM_PTR(&mod_fast_pow_obj));
 
 /* d = a**b (mod c) */
-static mp_obj_t mod_exptmod(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_exptmod(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_a, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -495,7 +495,7 @@ void free(void *ptr)
 #endif
 #endif
 
-static mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_generate_prime(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_num, MP_ARG_INT, {.u_int = 1024}},
@@ -536,7 +536,7 @@ static mp_obj_t mod_generate_prime(mp_uint_t n_args, const mp_obj_t *pos_args, m
 static MP_DEFINE_CONST_FUN_OBJ_KW(mod_generate_prime_obj, 1, mod_generate_prime);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(mod_static_generate_prime_obj, MP_ROM_PTR(&mod_generate_prime_obj));
 
-static mp_obj_t mod_is_prime(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t mod_is_prime(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_a, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -1127,7 +1127,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, curve_attr,
     locals_dict, &curve_locals_dict);
 
-static mp_obj_t curve(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t curve(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     /*
         Currently only curves in Weierstrass form (y^2 = x^3 + ax + b (mod p))
@@ -1773,7 +1773,7 @@ static mp_obj_t point_mul(mp_obj_t point, mp_obj_t scalar, mp_obj_t curve)
 static MP_DEFINE_CONST_FUN_OBJ_3(point_mul_obj, point_mul);
 static MP_DEFINE_CONST_STATICMETHOD_OBJ(static_point_mul_obj, MP_ROM_PTR(&point_mul_obj));
 
-static mp_obj_t signature(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t signature(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_r, MP_ARG_OBJ, {.u_obj = mp_const_none}},
@@ -2112,7 +2112,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, point_attr,
     locals_dict, &point_locals_dict);
 
-static mp_obj_t point(mp_uint_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+static mp_obj_t point(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_x, MP_ARG_OBJ, {.u_obj = mp_const_none}},
