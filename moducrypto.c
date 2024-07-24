@@ -206,7 +206,7 @@ static size_t mpz_as_fp_int(mpz_t *i, fp_int *b)
         mpz_abs_inpl(i, i);
     }
 
-    mpz_as_bytes(i, true, bsize, ib);
+    mpz_as_bytes(i, true, is_neg, bsize, ib);
 
     if (is_neg)
     {
