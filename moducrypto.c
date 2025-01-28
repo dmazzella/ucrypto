@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019-2024 Damiano Mazzella
+ * Copyright (c) 2019-2025 Damiano Mazzella
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -479,22 +479,6 @@ static int ucrypto_rng(unsigned char *dst, int len, void *dat)
 }
 
 /* generate prime number */
-
-#if defined(__thumb2__) || defined(__thumb__) || defined(__arm__)
-#if !defined(malloc) && !defined(free)
-void *malloc(size_t n)
-{
-    void *ptr = m_malloc(n);
-    return ptr;
-}
-
-void free(void *ptr)
-{
-    m_free(ptr);
-}
-#endif
-#endif
-
 static mp_obj_t mod_generate_prime(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
 {
     static const mp_arg_t allowed_args[] = {
@@ -506,8 +490,7 @@ static mp_obj_t mod_generate_prime(size_t n_args, const mp_obj_t *pos_args, mp_m
     {
         mp_arg_val_t num, test, safe;
     } args;
-    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);
-
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, (mp_arg_val_t *)&args);    
     if (args.num.u_int < 16 || args.num.u_int > 4096)
     {
         mp_raise_msg_varg(&mp_type_ValueError, ERROR_NUM_BITS, args.num.u_int);

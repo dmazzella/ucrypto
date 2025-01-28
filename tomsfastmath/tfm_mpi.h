@@ -1,7 +1,7 @@
 /*
  *
  * Porting to Micropython
- * Copyright (c) 2016-2023 Damiano Mazzella
+ * Copyright (c) 2016-2025 Damiano Mazzella
  *
 */
 
@@ -373,6 +373,7 @@ typedef unsigned long long ulong64;
 
 typedef ulong64 fp_digit;
 #define SIZEOF_FP_DIGIT 8
+#define DIGIT_SHIFT     6
 typedef unsigned long fp_word __attribute__((mode(TI)));
 
 #else
@@ -390,6 +391,7 @@ typedef signed long long long64;
 
 typedef unsigned int fp_digit;
 #define SIZEOF_FP_DIGIT 4
+#define DIGIT_SHIFT     5
 typedef ulong64 fp_word;
 #endif /* FP_64BIT */
 
