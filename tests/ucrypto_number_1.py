@@ -39,6 +39,9 @@ def exptmod(x, y, z, safe=True):
 
 
 for i in range(0, 5):
+    print("x1", x1)
+    print("y1", y1)
+    print("z1", z1)
     start = ticks_ms()
     print(exptmod(x1, y1, z1))
     end = ticks_ms()
@@ -56,9 +59,9 @@ for i in range(0, 5):
     end = ticks_ms()
     print("pow3", ticks_diff(end, start))
 
-    x1 = random.randint(0, sys.maxsize)
-    y1 = random.randint(0, sys.maxsize)
-    z1 = random.randint(0, sys.maxsize)
+    x1 = random.randint(1, sys.maxsize)
+    y1 = random.randint(1, sys.maxsize)
+    z1 = random.randint(1, sys.maxsize)
 
 ################################################################################
 

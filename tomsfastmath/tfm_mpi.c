@@ -3,9 +3,11 @@
  * Porting to Micropython
  * Copyright (c) 2016-2025 Damiano Mazzella
  *
-*/
+ */
 
 #include "tfm_mpi.h"
+
+#define TFM_PRE_GEN_MPI_C
 
 void fp_copy(const fp_int *a, fp_int *b)
 {
@@ -15,7 +17,7 @@ void fp_copy(const fp_int *a, fp_int *b)
    }
 }
 
-void fp_add(fp_int *a, fp_int *b, fp_int *c)
+void fp_add(const fp_int *a, const fp_int *b, fp_int *c)
 {
   int sa, sb;
 
@@ -51,7 +53,7 @@ void fp_add(fp_int *a, fp_int *b, fp_int *c)
 }
 
 /* c = a + b */
-void fp_add_d(fp_int *a, fp_digit b, fp_int *c)
+void fp_add_d(const fp_int *a, fp_digit b, fp_int *c)
 {
   fp_int tmp;
   fp_set(&tmp, b);
@@ -59,7 +61,7 @@ void fp_add_d(fp_int *a, fp_digit b, fp_int *c)
 }
 
 /* d = a + b (mod c) */
-int fp_addmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
+int fp_addmod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d)
 {
   fp_int tmp;
   fp_zero(&tmp);
@@ -67,7 +69,7 @@ int fp_addmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
   return fp_mod(&tmp, c, d);
 }
 
-int fp_cmp(fp_int *a, fp_int *b)
+int fp_cmp(const fp_int *a, const fp_int *b)
 {
   if (a->sign == FP_NEG && b->sign == FP_ZPOS)
   {
@@ -93,7 +95,7 @@ int fp_cmp(fp_int *a, fp_int *b)
 }
 
 /* compare against a single digit */
-int fp_cmp_d(fp_int *a, fp_digit b)
+int fp_cmp_d(const fp_int *a, fp_digit b)
 {
   /* compare based on sign */
   if ((b && a->used == 0) || a->sign == FP_NEG)
@@ -122,7 +124,7 @@ int fp_cmp_d(fp_int *a, fp_digit b)
   }
 }
 
-int fp_cmp_mag(fp_int *a, fp_int *b)
+int fp_cmp_mag(const fp_int *a, const fp_int *b)
 {
   int x;
 
@@ -152,7 +154,7 @@ int fp_cmp_mag(fp_int *a, fp_int *b)
 }
 
 /* c = a - b */
-void fp_sub(fp_int *a, fp_int *b, fp_int *c)
+void fp_sub(const fp_int *a, const fp_int *b, fp_int *c)
 {
   int sa, sb;
 
@@ -193,7 +195,7 @@ void fp_sub(fp_int *a, fp_int *b, fp_int *c)
 }
 
 /* c = a - b */
-void fp_sub_d(fp_int *a, fp_digit b, fp_int *c)
+void fp_sub_d(const fp_int *a, fp_digit b, fp_int *c)
 {
   fp_int tmp;
   fp_set(&tmp, b);
@@ -201,7 +203,7 @@ void fp_sub_d(fp_int *a, fp_digit b, fp_int *c)
 }
 
 /* d = a - b (mod c) */
-int fp_submod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
+int fp_submod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d)
 {
   fp_int tmp;
   fp_zero(&tmp);
@@ -210,7 +212,7 @@ int fp_submod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
 }
 
 /* unsigned addition */
-void s_fp_add(fp_int *a, fp_int *b, fp_int *c)
+void s_fp_add(const fp_int *a, const fp_int *b, fp_int *c)
 {
   int x, y, oldused;
   register fp_word t;
@@ -241,7 +243,7 @@ void s_fp_add(fp_int *a, fp_int *b, fp_int *c)
 }
 
 /* unsigned subtraction ||a|| >= ||b|| ALWAYS! */
-void s_fp_sub(fp_int *a, fp_int *b, fp_int *c)
+void s_fp_sub(const fp_int *a, const fp_int *b, fp_int *c)
 {
   int x, oldbused, oldused;
   fp_word t;
@@ -269,17 +271,7 @@ void s_fp_sub(fp_int *a, fp_int *b, fp_int *c)
   fp_clamp(c);
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
-int fp_radix_size(fp_int *a, int radix, int *size)
+int fp_radix_size(const fp_int *a, int radix, int *size)
 {
   fp_int t;
   fp_digit d;
@@ -318,16 +310,6 @@ int fp_radix_size(fp_int *a, int radix, int *size)
   (*size)++;
   return FP_OKAY;
 }
-
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 char fp_to_upper(char str)
 {
@@ -368,7 +350,7 @@ int fp_read_radix(fp_int *a, const char *str, int radix)
      * this allows numbers like 1AB and 1ab to represent the same  value
      * [e.g. in hex]
      */
-    ch = (char)((radix <= 36) ? fp_to_upper(*str) : *str);
+    ch = (char)((radix <= 36) ? fp_to_upper((int)*str) : *str);
     for (y = 0; y < 64; y++)
     {
       if (ch == fp_s_rmap[y])
@@ -505,18 +487,18 @@ void fp_reverse(unsigned char *s, int len)
 /* chars used in radix conversions */
 const char *fp_s_rmap = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
 
-int fp_signed_bin_size(fp_int *a)
+int fp_signed_bin_size(const fp_int *a)
 {
   return 1 + fp_unsigned_bin_size(a);
 }
 
-void fp_to_signed_bin(fp_int *a, unsigned char *b)
+void fp_to_signed_bin(const fp_int *a, unsigned char *b)
 {
   fp_to_unsigned_bin(a, b + 1);
   b[0] = (unsigned char)((a->sign == FP_ZPOS) ? 0 : 1);
 }
 
-void fp_to_unsigned_bin(fp_int *a, unsigned char *b)
+void fp_to_unsigned_bin(const fp_int *a, unsigned char *b)
 {
   int x;
   fp_int t;
@@ -532,20 +514,10 @@ void fp_to_unsigned_bin(fp_int *a, unsigned char *b)
   fp_reverse(b, x);
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
 /**
- * a:		pointer to fp_int representing the input number
- * str:		output buffer
- * radix:	number of character to use for encoding of the number
+ * a:       pointer to fp_int representing the input number
+ * str:     output buffer
+ * radix:   number of character to use for encoding of the number
  *
  * The radix value can be in the range 2 to 64. This function converts number
  * a into a string str. Please don't use this function because a too small
@@ -554,22 +526,12 @@ void fp_to_unsigned_bin(fp_int *a, unsigned char *b)
  *
  * Return: FP_VAL on error, FP_OKAY on success.
  */
-int fp_toradix(fp_int *a, char *str, int radix)
+int fp_toradix(const fp_int *a, char *str, int radix)
 {
   return fp_toradix_n(a, str, radix, INT_MAX);
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
-int fp_toradix_n(fp_int *a, char *str, int radix, int maxlen)
+int fp_toradix_n(const fp_int *a, char *str, int radix, int maxlen)
 {
   int digs;
   fp_int t;
@@ -618,8 +580,8 @@ int fp_toradix_n(fp_int *a, char *str, int radix, int maxlen)
   }
 
   /* reverse the digits of the string.  In this case _s points
-    * to the first digit [exluding the sign] of the number]
-    */
+   * to the first digit [exluding the sign] of the number]
+   */
   fp_reverse((unsigned char *)_s, digs);
 
   /* append a NULL so the string is properly terminated */
@@ -630,7 +592,7 @@ int fp_toradix_n(fp_int *a, char *str, int radix, int maxlen)
   return FP_OKAY;
 }
 
-int fp_unsigned_bin_size(fp_int *a)
+int fp_unsigned_bin_size(const fp_int *a)
 {
   int size = fp_count_bits(a);
   return (size / 8 + ((size & 7) != 0 ? 1 : 0));
@@ -640,7 +602,7 @@ static const int lnz[16] = {
     4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0};
 
 /* Counts the number of lsbs which are zero before the first zero bit */
-int fp_cnt_lsb(fp_int *a)
+int fp_cnt_lsb(const fp_int *a)
 {
   int x;
   fp_digit q, qq;
@@ -670,7 +632,7 @@ int fp_cnt_lsb(fp_int *a)
   return x;
 }
 
-int fp_count_bits(fp_int *a)
+int fp_count_bits(const fp_int *a)
 {
   int r;
   fp_digit q;
@@ -695,14 +657,15 @@ int fp_count_bits(fp_int *a)
 }
 
 /* b = a/2 */
-void fp_div_2(fp_int *a, fp_int *b)
+void fp_div_2(const fp_int *a, fp_int *b)
 {
   int x, oldused;
 
   oldused = b->used;
   b->used = a->used;
   {
-    register fp_digit r, rr, *tmpa, *tmpb;
+    register const fp_digit *tmpa;
+    register fp_digit r, rr, *tmpb;
 
     /* source alias */
     tmpa = a->dp + b->used - 1;
@@ -736,7 +699,7 @@ void fp_div_2(fp_int *a, fp_int *b)
 }
 
 /* c = a / 2**b */
-void fp_div_2d(fp_int *a, int b, fp_int *c, fp_int *d)
+void fp_div_2d(const fp_int *a, int b, fp_int *c, fp_int *d)
 {
   fp_digit D, r, rr;
   int x;
@@ -834,7 +797,7 @@ void fp_lshd(fp_int *a, int x)
 }
 
 /* c = a mod 2**d */
-void fp_mod_2d(fp_int *a, int b, fp_int *c)
+void fp_mod_2d(const fp_int *a, int b, fp_int *c)
 {
   int x;
 
@@ -893,7 +856,7 @@ void fp_rshd(fp_int *a, int x)
 }
 
 /* a/b => cb + d == a */
-int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
+int fp_div(const fp_int *a, const fp_int *b, fp_int *c, fp_int *d)
 {
   fp_int q, x, y, t1, t2;
   int n, t, i, norm, neg;
@@ -967,7 +930,7 @@ int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
       continue;
     }
 
-    /* step 3.1 if xi == yt then set q{i-t-1} to b-1, 
+    /* step 3.1 if xi == yt then set q{i-t-1} to b-1,
      * otherwise set q{i-t-1} to (xi*b + x{i-1})/yt */
     if (x.dp[i] == y.dp[t])
     {
@@ -982,10 +945,10 @@ int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
       q.dp[i - t - 1] = (fp_digit)(tmp);
     }
 
-    /* while (q{i-t-1} * (yt * b + y{t-1})) > 
-             xi * b**2 + xi-1 * b + xi-2 
-     
-       do q{i-t-1} -= 1; 
+    /* while (q{i-t-1} * (yt * b + y{t-1})) >
+             xi * b**2 + xi-1 * b + xi-2
+
+       do q{i-t-1} -= 1;
     */
     q.dp[i - t - 1] = (q.dp[i - t - 1] + 1);
     do
@@ -1021,8 +984,8 @@ int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
     }
   }
 
-  /* now q is the quotient and x is the remainder 
-   * [which we have to normalize] 
+  /* now q is the quotient and x is the remainder
+   * [which we have to normalize]
    */
 
   /* get sign before writing to c */
@@ -1039,9 +1002,9 @@ int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
   {
     fp_div_2d(&x, norm, &x, NULL);
 
-    /* the following is a kludge, essentially we were seeing the right remainder but 
-   with excess digits that should have been zero
- */
+    /* the following is a kludge, essentially we were seeing the right remainder but
+       with excess digits that should have been zero
+     */
     for (i = b->used; i < x.used; i++)
     {
       x.dp[i] = 0;
@@ -1075,7 +1038,7 @@ static int s_is_power_of_two(fp_digit b, int *p)
 }
 
 /* a/b => cb + d == a */
-int fp_div_d(fp_int *a, fp_digit b, fp_int *c, fp_digit *d)
+int fp_div_d(const fp_int *a, fp_digit b, fp_int *c, fp_digit *d)
 {
   fp_int q;
   fp_word w;
@@ -1153,7 +1116,7 @@ int fp_div_d(fp_int *a, fp_digit b, fp_int *c, fp_digit *d)
 }
 
 /* c = a mod b, 0 <= c < b  */
-int fp_mod(fp_int *a, fp_int *b, fp_int *c)
+int fp_mod(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int t;
   int err;
@@ -1175,7 +1138,7 @@ int fp_mod(fp_int *a, fp_int *b, fp_int *c)
 }
 
 /* c = a mod b, 0 <= c < b  */
-int fp_mod_d(fp_int *a, fp_digit b, fp_digit *c)
+int fp_mod_d(const fp_int *a, fp_digit b, fp_digit *c)
 {
   return fp_div_d(a, b, NULL, c);
 }
@@ -1208,11 +1171,11 @@ void fp_2expt(fp_int *a, int b)
 
 #ifdef TFM_TIMING_RESISTANT
 
-/* timing resistant montgomery ladder based exptmod 
+/* timing resistant montgomery ladder based exptmod
 
    Based on work by Marc Joye, Sung-Ming Yen, "The Montgomery Powering Ladder", Cryptographic Hardware and Embedded Systems, CHES 2002
 */
-static int _fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
+static int s_fp_exptmod(const fp_int *G, const fp_int *X, const fp_int *P, fp_int *Y)
 {
   fp_int R[2];
   fp_digit buf, mp;
@@ -1284,10 +1247,10 @@ static int _fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
 
 #else
 
-/* y = g**x (mod b) 
+/* y = g**x (mod b)
  * Some restrictions... x must be positive and < b
  */
-static int _fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
+static int s_fp_exptmod(const fp_int *G, const fp_int *X, const fp_int *P, fp_int *Y)
 {
   fp_int M[64], res;
   fp_digit buf, mp;
@@ -1470,7 +1433,12 @@ static int _fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
 
 #endif
 
-int fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
+/*
+ * X should really be const...  however, if it's negative, this function
+ * temporarly changes it to be positive, so we leave it non-const for the
+ * sake of efficiency.
+ */
+int fp_exptmod(const fp_int *G, const fp_int *X, const fp_int *P, fp_int *Y)
 {
   fp_int tmp;
   int err;
@@ -1479,7 +1447,6 @@ int fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
   /* prevent overflows */
   if (P->used > (FP_SIZE / 2))
   {
-    printf("TFM_CHECK prevent overflows\n");
     return FP_VAL;
   }
 #endif
@@ -1493,52 +1460,114 @@ int fp_exptmod(fp_int *G, fp_int *X, fp_int *P, fp_int *Y)
     {
       return err;
     }
-    X->sign = FP_ZPOS;
-    err = _fp_exptmod(&tmp, X, P, Y);
-    if (X != Y)
-    {
-      X->sign = FP_NEG;
-    }
+#if 0 /* s_fp_exptmod() doesn't look at the sign! */
+      X->sign = FP_ZPOS;
+#endif
+    err = s_fp_exptmod(&tmp, X, P, Y);
+#if 0 /* X->sign is unchanged... */
+      if (X != Y) {
+         X->sign = FP_NEG;
+      }
+#endif
     return err;
   }
   else
   {
     /* Positive exponent so just exptmod */
-    return _fp_exptmod(G, X, P, Y);
+    return s_fp_exptmod(G, X, P, Y);
   }
 }
-
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 #ifndef GIT_VERSION
 #define GIT_VERSION TFM_VERSION_S
 #endif
 
+#define dnstrcon_direct(D, N, S)          \
+  do                                      \
+  {                                       \
+    dnmemcpy((D), (N), S, sizeof(S) - 1); \
+  } while (0)
+#define dnstrcon(D, N, S)                           \
+  do                                                \
+  {                                                 \
+    if (dnmemcpy((D), (N), S, sizeof(S) - 1) == -1) \
+      goto err_out;                                 \
+  } while (0)
+static signed long dnmemcpy(char **d, size_t *n, const char *s, size_t len)
+{
+  if (len >= *n)
+    return -1;
+  memcpy(*d, s, len);
+  *n -= len;
+  *d += len;
+  **d = '\0';
+  return len;
+}
+
+/* log(2)/log(10) ~= 0.30102999... ~= 30103 / 100000
+ * we need to add one byte because this rounds to zero, and one for sign
+ * these provide exact answer for integers up to 4720 bytes wide... */
+#define U_DIGITS(T) (1 + ((sizeof(T) * 8UL) * 30103UL) / 100000UL)
+#define S_DIGITS(T) (2 + ((sizeof(T) * 8UL - 1) * 30103UL) / 100000UL)
+
+#define dnstrul(D, N, V)                   \
+  do                                       \
+  {                                        \
+    if (dnstrul_impl((D), (N), (V)) == -1) \
+      goto err_out;                        \
+  } while (0)
+static signed long dnstrul_impl(char **d, size_t *n, unsigned long value)
+{
+  char digits[U_DIGITS(unsigned long) + 1]; /* fit digits plus null byte */
+  char *digit = digits + (sizeof(digits) - 1);
+  size_t len = 0;
+  *digit = '\0';
+  do
+  {
+    *--digit = '0' + (value % 10);
+    value /= 10;
+    ++len;
+    if (digit < digits)
+      return -1;
+  } while (value);
+  if (len >= *n)
+    return -1;
+  return dnmemcpy(d, n, digit, len);
+}
+
 const char *fp_ident(void)
 {
-  static char buf[1024];
+  static char buf[512];
+  char *d = buf;
+  size_t n = sizeof(buf);
 
-  memset(buf, 0, sizeof(buf));
-  snprintf(buf, sizeof(buf) - 1,
+  dnstrcon(&d, &n,
            "TomsFastMath " GIT_VERSION "\n"
 #if defined(TFM_IDENT_BUILD_DATE)
            "Built on " __DATE__ " at " __TIME__ "\n"
 #endif
            "\n"
            "Sizeofs\n"
-           "\tfp_digit = %lu\n"
-           "\tfp_word  = %lu\n"
+           "\tfp_digit = ");
+  dnstrul(&d, &n, sizeof(fp_digit));
+  dnstrcon(&d, &n,
            "\n"
-           "FP_MAX_SIZE = %u\n"
+           "\tfp_word  = ");
+  dnstrul(&d, &n, sizeof(fp_word));
+  dnstrcon(&d, &n,
+           "\n\n"
+           "FP_MAX_SIZE      = ");
+  dnstrul(&d, &n, FP_MAX_SIZE);
+  dnstrcon(&d, &n,
            "\n"
+           "SIZEOF_FP_DIGIT  = ");
+  dnstrul(&d, &n, SIZEOF_FP_DIGIT);
+  dnstrcon(&d, &n,
+           "\n"
+           "DIGIT_SHIFT      = ");
+  dnstrul(&d, &n, DIGIT_SHIFT);
+  dnstrcon(&d, &n,
+           "\n\n"
            "Defines: \n"
 #ifdef __i386__
            " __i386__ "
@@ -1570,30 +1599,15 @@ const char *fp_ident(void)
 #ifdef TFM_ECC224
            " TFM_ECC224 "
 #endif
-#ifdef TFM_ECC256
-           " TFM_ECC256 "
-#endif
 #ifdef TFM_ECC384
            " TFM_ECC384 "
 #endif
-#ifdef TFM_ECC512
-           " TFM_ECC512 "
-#endif
-#ifdef TFM_RSA512
-           " TFM_RSA512 "
-#endif
-#ifdef TFM_RSA1024
-           " TFM_RSA1024 "
-#endif
-#ifdef TFM_RSA2048
-           " TFM_RSA2048 "
+#ifdef TFM_ECC521
+           " TFM_ECC521 "
 #endif
 
 #ifdef TFM_NO_ASM
            " TFM_NO_ASM "
-#endif
-#ifdef TFM_ASM
-           " TFM_ASM "
 #endif
 #ifdef FP_64BIT
            " FP_64BIT "
@@ -1601,101 +1615,25 @@ const char *fp_ident(void)
 #ifdef TFM_HUGE
            " TFM_HUGE "
 #endif
-#ifdef TFM_MUL3
-           " TFM_MUL3 "
-#endif
-#ifdef TFM_SQR3
-           " TFM_SQR3 "
-#endif
-#ifdef TFM_MUL4
-           " TFM_MUL4 "
-#endif
-#ifdef TFM_SQR4
-           " TFM_SQR4 "
-#endif
-#ifdef TFM_MUL6
-           " TFM_MUL6 "
-#endif
-#ifdef TFM_SQR6
-           " TFM_SQR6 "
-#endif
-#ifdef TFM_MUL7
-           " TFM_MUL7 "
-#endif
-#ifdef TFM_SQR7
-           " TFM_SQR7 "
-#endif
-#ifdef TFM_MUL8
-           " TFM_MUL8 "
-#endif
-#ifdef TFM_SQR8
-           " TFM_SQR8 "
-#endif
-#ifdef TFM_MUL9
-           " TFM_MUL9 "
-#endif
-#ifdef TFM_SQR9
-           " TFM_SQR9 "
-#endif
-#ifdef TFM_MUL12
-           " TFM_MUL12 "
-#endif
-#ifdef TFM_SQR12
-           " TFM_SQR12 "
-#endif
-#ifdef TFM_SMALL_SET
-           " TFM_SMALL_SET "
-#endif
-#ifdef TFM_MUL17
-           " TFM_MUL17 "
-#endif
-#ifdef TFM_SQR17
-           " TFM_SQR17 "
-#endif
-#ifdef TFM_MUL20
-           " TFM_MUL20 "
-#endif
-#ifdef TFM_SQR20
-           " TFM_SQR20 "
-#endif
-#ifdef TFM_MUL24
-           " TFM_MUL24 "
-#endif
-#ifdef TFM_SQR24
-           " TFM_SQR24 "
-#endif
-#ifdef TFM_MUL28
-           " TFM_MUL28 "
-#endif
-#ifdef TFM_SQR28
-           " TFM_SQR28 "
-#endif
-#ifdef TFM_MUL32
-           " TFM_MUL32 "
-#endif
-#ifdef TFM_SQR32
-           " TFM_SQR32 "
-#endif
-#ifdef TFM_MUL48
-           " TFM_MUL48 "
-#endif
-#ifdef TFM_SQR48
-           " TFM_SQR48 "
-#endif
-#ifdef TFM_MUL64
-           " TFM_MUL64 "
-#endif
-#ifdef TFM_SQR64
-           " TFM_SQR64 "
-#endif
-           "\n",
-           (unsigned long)sizeof(fp_digit), (unsigned long)sizeof(fp_word), FP_MAX_SIZE);
+           "\n");
 
   if (sizeof(fp_digit) == sizeof(fp_word))
   {
-    strncat(buf, "WARNING: sizeof(fp_digit) == sizeof(fp_word), this build is likely to not work properly.\n",
-            sizeof(buf) - strlen(buf) - 1);
+    dnstrcon(&d, &n,
+             "WARNING: sizeof(fp_digit) == sizeof(fp_word),"
+             " this build is likely to not work properly.\n");
   }
+
+  memset(d, 0, n);
+  return buf;
+err_out:
+  d = buf;
+  n = sizeof(buf);
+  *d = '\0';
+
+  dnstrcon_direct(&d, &n,
+                  "ERROR: Buffer too small.\n");
+
   return buf;
 }
 
@@ -1703,21 +1641,13 @@ const char *fp_ident(void)
 
 int main(void)
 {
-  printf("%s\n", fp_ident());
+  const char *ident = fp_ident();
+  printf("%s\n", ident);
+  printf("ident len: %lu\n", (unsigned long)strlen(ident));
   return 0;
 }
 
 #endif
-
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 #if FP_GEN_RANDOM_MAX == 0xffffffff
 #define FP_GEN_RANDOM_SHIFT 32
@@ -1783,7 +1713,7 @@ void fp_set(fp_int *a, fp_digit b)
 /* computes a = B**n mod b without division or multiplication useful for
  * normalizing numbers in a Montgomery system.
  */
-void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
+void fp_montgomery_calc_normalization(fp_int *a, const fp_int *b)
 {
   int x, bits;
 
@@ -1814,16 +1744,6 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
   }
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
 /******************************************************************/
 #if defined(TFM_X86) && !defined(TFM_SSE2)
 /* x86-32 code */
@@ -1843,11 +1763,8 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "addl %%eax,%0 \n\t"                          \
       "adcl $0,%%edx \n\t"                          \
       "movl %%edx,%1 \n\t"                          \
-                                                    \
       : "=g"(_c[LO]), "=r"(cy)                      \
-                                                    \
       : "0"(_c[LO]), "1"(cy), "r"(mu), "r"(*tmpm++) \
-                                                    \
       : "%eax", "%edx", "cc")
 
 #define PROPCARRY              \
@@ -1855,11 +1772,8 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "addl   %1,%0    \n\t"   \
       "setb   %%al     \n\t"   \
       "movzbl %%al,%1 \n\t"    \
-                               \
       : "=g"(_c[LO]), "=r"(cy) \
-                               \
       : "0"(_c[LO]), "1"(cy)   \
-                               \
       : "%eax", "cc")
 
 /******************************************************************/
@@ -1881,11 +1795,8 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "addq %%rax,%0 \n\t"                          \
       "adcq $0,%%rdx \n\t"                          \
       "movq %%rdx,%1 \n\t"                          \
-                                                    \
       : "=g"(_c[LO]), "=r"(cy)                      \
-                                                    \
       : "0"(_c[LO]), "1"(cy), "r"(mu), "r"(*tmpm++) \
-                                                    \
       : "%rax", "%rdx", "cc")
 
 #define INNERMUL8                            \
@@ -1978,9 +1889,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "movq %%rdx,%1       \n\t"             \
                                              \
       : "=r"(_c), "=r"(cy)                   \
-                                             \
       : "0"(_c), "1"(cy), "g"(mu), "r"(tmpm) \
-                                             \
       : "%rax", "%rdx", "%r10", "%r11", "cc")
 
 #define PROPCARRY              \
@@ -1988,11 +1897,8 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "addq   %1,%0    \n\t"   \
       "setb   %%al     \n\t"   \
       "movzbq %%al,%1 \n\t"    \
-                               \
       : "=g"(_c[LO]), "=r"(cy) \
-                               \
       : "0"(_c[LO]), "1"(cy)   \
-                               \
       : "%rax", "cc")
 
 /******************************************************************/
@@ -2015,9 +1921,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START                \
   asm(                            \
       "movd %0,%%mm1        \n\t" \
-                                  \
       "pxor %%mm3,%%mm3     \n\t" \
-                                  \
       "pmuludq %%mm2,%%mm1  \n\t" ::"g"(c[x]))
 
 /* pmuludq on mmx registers does a 32x32->64 multiply. */
@@ -2030,9 +1934,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "paddq %%mm0,%%mm3    \n\t" \
       "movd %%mm3,%0        \n\t" \
       "psrlq $32, %%mm3     \n\t" \
-                                  \
-      : "=g"(_c[LO])              \
-      : "0"(_c[LO]), "g"(*tmpm++));
+      : "=g"(_c[LO]) : "0"(_c[LO]), "g"(*tmpm++));
 
 #define INNERMUL8                  \
   asm(                             \
@@ -2099,24 +2001,18 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       "paddq %%mm5,%%mm3    \n\t"  \
       "movd %%mm3,28(%0)    \n\t"  \
       "psrlq $32, %%mm3     \n\t"  \
-                                   \
-      : "=r"(_c)                   \
-      : "0"(_c), "g"(tmpm));
+      : "=r"(_c) : "0"(_c), "g"(tmpm));
 
-#define LOOP_END          \
-  asm("movd %%mm3,%0  \n" \
-      : "=r"(cy))
+#define LOOP_END \
+  asm("movd %%mm3,%0  \n" : "=r"(cy))
 
 #define PROPCARRY              \
   asm(                         \
       "addl   %1,%0    \n\t"   \
       "setb   %%al     \n\t"   \
       "movzbl %%al,%1 \n\t"    \
-                               \
       : "=g"(_c[LO]), "=r"(cy) \
-                               \
       : "0"(_c[LO]), "1"(cy)   \
-                               \
       : "%eax", "cc")
 
 /******************************************************************/
@@ -2129,50 +2025,15 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#ifdef __thumb__
-
-#define INNERMUL                                   \
-  __asm__(                                         \
-      " LDR    r0,%1            \n\t"              \
-      " ADDS   r0,r0,%0         \n\t"              \
-      " ITE    CS               \n\t"              \
-      " MOVCS  %0,#1            \n\t"              \
-      " MOVCC  %0,#0            \n\t"              \
-      " UMLAL  r0,%0,%3,%4      \n\t"              \
-      " STR    r0,%1            \n\t"              \
-      : "=r"(cy), "=m"(_c[0])                      \
-      : "0"(cy), "r"(mu), "r"(*tmpm++), "m"(_c[0]) \
-      : "r0", "cc");
-
-#define PROPCARRY                    \
-  __asm__(                           \
-      " LDR   r0,%1            \n\t" \
-      " ADDS  r0,r0,%0         \n\t" \
-      " STR   r0,%1            \n\t" \
-      " ITE   CS               \n\t" \
-      " MOVCS %0,#1            \n\t" \
-      " MOVCC %0,#0            \n\t" \
-      : "=r"(cy), "=m"(_c[0])        \
-      : "0"(cy), "m"(_c[0])          \
-      : "r0", "cc");
-
-/* TAO thumb mode uses ite (if then else) to detect carry directly
- * fixed unmatched constraint warning by changing 1 to m  */
-
-#else /* __thumb__ */
-
-#define INNERMUL                                   \
-  asm(                                             \
-      " LDR    r0,%1            \n\t"              \
-      " ADDS   r0,r0,%0         \n\t"              \
-      " MOVCS  %0,#1            \n\t"              \
-      " MOVCC  %0,#0            \n\t"              \
-      " UMLAL  r0,%0,%3,%4      \n\t"              \
-      " STR    r0,%1            \n\t"              \
-                                                   \
-      : "=r"(cy), "=m"(_c[0])                      \
-      : "0"(cy), "r"(mu), "r"(*tmpm++), "1"(_c[0]) \
-      : "r0", "cc");
+#define INNERMUL                      \
+  asm(                                \
+      " LDR    r0,%1            \n\t" \
+      " ADDS   r0,r0,%0         \n\t" \
+      " MOVCS  %0,#1            \n\t" \
+      " MOVCC  %0,#0            \n\t" \
+      " UMLAL  r0,%0,%3,%4      \n\t" \
+      " STR    r0,%1            \n\t" \
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "r"(mu), "r"(*tmpm++), "m"(_c[0]) : "r0", "cc");
 
 #define PROPCARRY                    \
   asm(                               \
@@ -2181,12 +2042,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       " STR   r0,%1            \n\t" \
       " MOVCS %0,#1            \n\t" \
       " MOVCC %0,#0            \n\t" \
-                                     \
-      : "=r"(cy), "=m"(_c[0])        \
-      : "0"(cy), "1"(_c[0])          \
-      : "r0", "cc");
-
-#endif /* __thumb__ */
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "m"(_c[0]) : "r0", "cc");
 
 /******************************************************************/
 #elif defined(TFM_PPC32)
@@ -2198,19 +2054,15 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#define INNERMUL                                   \
-                                                   \
-  asm(                                             \
-      " mullw    16,%3,%4       \n\t"              \
-      " mulhwu   17,%3,%4       \n\t"              \
-      " addc     16,16,%2       \n\t"              \
-      " addze    17,17          \n\t"              \
-      " addc     %1,16,%5       \n\t"              \
-      " addze    %0,17          \n\t"              \
-                                                   \
-      : "=r"(cy), "=r"(_c[0])                      \
-      : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) \
-      : "16", "17", "cc");                         \
+#define INNERMUL                                                                                \
+  asm(                                                                                          \
+      " mullw    16,%3,%4       \n\t"                                                           \
+      " mulhwu   17,%3,%4       \n\t"                                                           \
+      " addc     16,16,%2       \n\t"                                                           \
+      " addze    17,17          \n\t"                                                           \
+      " addc     %1,16,%5       \n\t"                                                           \
+      " addze    %0,17          \n\t"                                                           \
+      : "=r"(cy), "=r"(_c[0]) : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) : "16", "17", "cc"); \
   ++tmpm;
 
 #define PROPCARRY                    \
@@ -2218,10 +2070,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       " addc     %1,%3,%2      \n\t" \
       " xor      %0,%2,%2      \n\t" \
       " addze    %0,%2         \n\t" \
-                                     \
-      : "=r"(cy), "=r"(_c[0])        \
-      : "0"(cy), "1"(_c[0])          \
-      : "cc");
+      : "=r"(cy), "=r"(_c[0]) : "0"(cy), "1"(_c[0]) : "cc");
 
 /******************************************************************/
 #elif defined(TFM_PPC64)
@@ -2233,21 +2082,17 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#define INNERMUL                                   \
-                                                   \
-  asm(                                             \
-      " mulld    r16,%3,%4       \n\t"             \
-      " mulhdu   r17,%3,%4       \n\t"             \
-      " addc     r16,16,%0       \n\t"             \
-      " addze    r17,r17          \n\t"            \
-      " ldx      r18,0,%1        \n\t"             \
-      " addc     r16,r16,r18       \n\t"           \
-      " addze    %0,r17          \n\t"             \
-      " sdx      r16,0,%1        \n\t"             \
-                                                   \
-      : "=r"(cy), "=m"(_c[0])                      \
-      : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) \
-      : "r16", "r17", "r18", "cc");                \
+#define INNERMUL                                                                                         \
+  asm(                                                                                                   \
+      " mulld    r16,%3,%4       \n\t"                                                                   \
+      " mulhdu   r17,%3,%4       \n\t"                                                                   \
+      " addc     r16,16,%0       \n\t"                                                                   \
+      " addze    r17,r17          \n\t"                                                                  \
+      " ldx      r18,0,%1        \n\t"                                                                   \
+      " addc     r16,r16,r18       \n\t"                                                                 \
+      " addze    %0,r17          \n\t"                                                                   \
+      " sdx      r16,0,%1        \n\t"                                                                   \
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) : "r16", "r17", "r18", "cc"); \
   ++tmpm;
 
 #define PROPCARRY                      \
@@ -2257,10 +2102,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       " sdx      r16,0,%1       \n\t"  \
       " xor      %0,%0,%0      \n\t"   \
       " addze    %0,%0         \n\t"   \
-                                       \
-      : "=r"(cy), "=m"(_c[0])          \
-      : "0"(cy), "1"(_c[0])            \
-      : "r16", "cc");
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "1"(_c[0]) : "r16", "cc");
 
 /******************************************************************/
 #elif defined(TFM_AVR32)
@@ -2272,19 +2114,16 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#define INNERMUL                                \
-  asm(                                          \
-      " ld.w   r2,%1            \n\t"           \
-      " add    r2,%0            \n\t"           \
-      " eor    r3,r3            \n\t"           \
-      " acr    r3               \n\t"           \
-      " macu.d r2,%3,%4         \n\t"           \
-      " st.w   %1,r2            \n\t"           \
-      " mov    %0,r3            \n\t"           \
-                                                \
-      : "=r"(cy), "=r"(_c)                      \
-      : "0"(cy), "r"(mu), "r"(*tmpm++), "1"(_c) \
-      : "r2", "r3");
+#define INNERMUL                      \
+  asm(                                \
+      " ld.w   r2,%1            \n\t" \
+      " add    r2,%0            \n\t" \
+      " eor    r3,r3            \n\t" \
+      " acr    r3               \n\t" \
+      " macu.d r2,%3,%4         \n\t" \
+      " st.w   %1,r2            \n\t" \
+      " mov    %0,r3            \n\t" \
+      : "=r"(cy), "=r"(_c) : "0"(cy), "r"(mu), "r"(*tmpm++), "1"(_c) : "r2", "r3");
 
 #define PROPCARRY                    \
   asm(                               \
@@ -2293,10 +2132,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       " st.w     %1,r2         \n\t" \
       " eor      %0,%0         \n\t" \
       " acr      %0            \n\t" \
-                                     \
-      : "=r"(cy), "=r"(&_c[0])       \
-      : "0"(cy), "1"(&_c[0])         \
-      : "r2", "cc");
+      : "=r"(cy), "=r"(&_c[0]) : "0"(cy), "1"(&_c[0]) : "r2", "cc");
 
 /******************************************************************/
 #elif defined(TFM_MIPS)
@@ -2308,24 +2144,20 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#define INNERMUL                                   \
-                                                   \
-  asm(                                             \
-      " multu    %3,%4          \n\t"              \
-      " mflo     $12            \n\t"              \
-      " mfhi     $13            \n\t"              \
-      " addu     $12,$12,%0     \n\t"              \
-      " sltu     $10,$12,%0     \n\t"              \
-      " addu     $13,$13,$10    \n\t"              \
-      " lw       $10,%1         \n\t"              \
-      " addu     $12,$12,$10    \n\t"              \
-      " sltu     $10,$12,$10    \n\t"              \
-      " addu     %0,$13,$10     \n\t"              \
-      " sw       $12,%1         \n\t"              \
-                                                   \
-      : "=r"(cy), "=m"(_c[0])                      \
-      : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) \
-      : "$10", "$12", "$13");                      \
+#define INNERMUL                                                                                   \
+  asm(                                                                                             \
+      " multu    %3,%4          \n\t"                                                              \
+      " mflo     $12            \n\t"                                                              \
+      " mfhi     $13            \n\t"                                                              \
+      " addu     $12,$12,%0     \n\t"                                                              \
+      " sltu     $10,$12,%0     \n\t"                                                              \
+      " addu     $13,$13,$10    \n\t"                                                              \
+      " lw       $10,%1         \n\t"                                                              \
+      " addu     $12,$12,$10    \n\t"                                                              \
+      " sltu     $10,$12,$10    \n\t"                                                              \
+      " addu     %0,$13,$10     \n\t"                                                              \
+      " sw       $12,%1         \n\t"                                                              \
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "r"(mu), "r"(tmpm[0]), "1"(_c[0]) : "$10", "$12", "$13"); \
   ++tmpm;
 
 #define PROPCARRY                    \
@@ -2334,10 +2166,7 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
       " addu     $10,$10,%0    \n\t" \
       " sw       $10,%1        \n\t" \
       " sltu     %0,$10,%0     \n\t" \
-                                     \
-      : "=r"(cy), "=m"(_c[0])        \
-      : "0"(cy), "1"(_c[0])          \
-      : "$10");
+      : "=r"(cy), "=m"(_c[0]) : "0"(cy), "1"(_c[0]) : "$10");
 
 /******************************************************************/
 #else
@@ -2349,13 +2178,13 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 #define LOOP_START \
   mu = c[x] * mp
 
-#define INNERMUL                                      \
-  do                                                  \
-  {                                                   \
-    fp_word t;                                        \
-    _c[0] = t = ((fp_word)_c[0] + (fp_word)cy) +      \
-                (((fp_word)mu) * ((fp_word)*tmpm++)); \
-    cy = (t >> DIGIT_BIT);                            \
+#define INNERMUL                                        \
+  do                                                    \
+  {                                                     \
+    fp_word t;                                          \
+    _c[0] = t = ((fp_word)_c[0] + (fp_word)cy) +        \
+                (((fp_word)mu) * ((fp_word) * tmpm++)); \
+    cy = (t >> DIGIT_BIT);                              \
   } while (0)
 
 #define PROPCARRY             \
@@ -2370,14 +2199,15 @@ void fp_montgomery_calc_normalization(fp_int *a, fp_int *b)
 
 #define LO 0
 
-// #ifdef TFM_SMALL_MONT_SET
-// #include "fp_mont_small.i"
-// #endif
+#ifdef TFM_SMALL_MONT_SET
+#include "fp_mont_small.i"
+#endif
 
 /* computes x/R == x (mod N) via Montgomery Reduction */
-void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
+void fp_montgomery_reduce(fp_int *a, const fp_int *m, fp_digit mp)
 {
-  fp_digit c[FP_SIZE], *_c, *tmpm, mu;
+  const fp_digit *tmpm;
+  fp_digit c[FP_SIZE], *_c, *tmpa, mu;
   int oldused, x, y, pa;
 
   /* bail if too large */
@@ -2396,7 +2226,7 @@ void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
 
 #if defined(USE_MEMSET)
   /* now zero the buff */
-  memset(c, 0, sizeof c);
+  memset(c, 0, sizeof(c));
 #endif
   pa = m->used;
 
@@ -2446,15 +2276,15 @@ void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
 
   /* now copy out */
   _c = c + pa;
-  tmpm = a->dp;
+  tmpa = a->dp;
   for (x = 0; x < pa + 1; x++)
   {
-    *tmpm++ = *_c++;
+    *tmpa++ = *_c++;
   }
 
   for (; x < oldused; x++)
   {
-    *tmpm++ = 0;
+    *tmpa++ = 0;
   }
 
   MONT_FINI;
@@ -2470,18 +2300,18 @@ void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
 }
 
 /* setups the montgomery reduction */
-int fp_montgomery_setup(fp_int *a, fp_digit *rho)
+int fp_montgomery_setup(const fp_int *a, fp_digit *rho)
 {
   fp_digit x, b;
 
   /* fast inversion mod 2**k
- *
- * Based on the fact that
- *
- * XA = 1 (mod 2**n)  =>  (X(2-XA)) A = 1 (mod 2**2n)
- *                    =>  2*X*A - X*X*A*A = 1
- *                    =>  2*(1) - (1)     = 1
- */
+   *
+   * Based on the fact that
+   *
+   * XA = 1 (mod 2**n)  =>  (X(2-XA)) A = 1 (mod 2**2n)
+   *                    =>  2*X*A - X*X*A*A = 1
+   *                    =>  2*(1) - (1)     = 1
+   */
   b = a->dp[0];
 
   if ((b & 1) == 0)
@@ -2503,22 +2333,13 @@ int fp_montgomery_setup(fp_int *a, fp_digit *rho)
   return FP_OKAY;
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
 /* c = a * b */
-void fp_mul(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul(const fp_int *A, const fp_int *B, fp_int *C)
 {
   int y, old_used;
 #if FP_SIZE >= 48
   int yy;
+  (void)yy;
 #endif
 
   old_used = C->used;
@@ -2533,13 +2354,12 @@ void fp_mul(fp_int *A, fp_int *B, fp_int *C)
   y = MAX(A->used, B->used);
 #if FP_SIZE >= 48
   yy = MIN(A->used, B->used);
-  (void)yy;
 #endif
   /* pick a comba (unrolled 4/8/16/32 x or rolled) based on the size
-       of the largest input.  We also want to avoid doing excess mults if the
-       inputs are not close to the next power of two.  That is, for example,
-       if say y=17 then we would do (32-17)^2 = 225 unneeded multiplications
-    */
+     of the largest input.  We also want to avoid doing excess mults if the
+     inputs are not close to the next power of two.  That is, for example,
+     if say y=17 then we would do (32-17)^2 = 225 unneeded multiplications
+  */
 
 #if defined(TFM_MUL3) && FP_SIZE >= 6
   if (y <= 3)
@@ -2649,19 +2469,13 @@ void fp_mul(fp_int *A, fp_int *B, fp_int *C)
 #endif
   fp_mul_comba(A, B, C);
 clean:
-{
-  /* now zero any excess digits on the destination 
-     * that we didn't write to 
-     */
-  register fp_digit *tmpb = C->dp + C->used;
   for (y = C->used; y < old_used; y++)
   {
-    *tmpb++ = 0;
+    C->dp[y] = 0;
   }
 }
-}
 
-void fp_mul_2(fp_int *a, fp_int *b)
+void fp_mul_2(const fp_int *a, fp_int *b)
 {
   int x, oldused;
 
@@ -2669,7 +2483,8 @@ void fp_mul_2(fp_int *a, fp_int *b)
   b->used = a->used;
 
   {
-    register fp_digit r, rr, *tmpa, *tmpb;
+    register const fp_digit *tmpa;
+    register fp_digit r, rr, *tmpb;
 
     /* alias for source */
     tmpa = a->dp;
@@ -2682,16 +2497,16 @@ void fp_mul_2(fp_int *a, fp_int *b)
     for (x = 0; x < a->used; x++)
     {
 
-      /* get what will be the *next* carry bit from the 
-       * MSB of the current digit 
+      /* get what will be the *next* carry bit from the
+       * MSB of the current digit
        */
       rr = *tmpa >> ((fp_digit)(DIGIT_BIT - 1));
 
       /* now shift up this digit, add in the carry [from the previous] */
       *tmpb++ = ((*tmpa++ << ((fp_digit)1)) | r);
 
-      /* copy the carry that would be from the source 
-       * digit into the next iteration 
+      /* copy the carry that would be from the source
+       * digit into the next iteration
        */
       r = rr;
     }
@@ -2704,8 +2519,8 @@ void fp_mul_2(fp_int *a, fp_int *b)
       ++(b->used);
     }
 
-    /* now zero any excess digits on the destination 
-     * that we didn't write to 
+    /* now zero any excess digits on the destination
+     * that we didn't write to
      */
     tmpb = b->dp + b->used;
     for (x = b->used; x < oldused; x++)
@@ -2717,7 +2532,7 @@ void fp_mul_2(fp_int *a, fp_int *b)
 }
 
 /* c = a * 2**d */
-void fp_mul_2d(fp_int *a, int b, fp_int *c)
+void fp_mul_2d(const fp_int *a, int b, fp_int *c)
 {
   fp_digit carry, carrytmp, shift;
   int x;
@@ -2751,16 +2566,6 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
   }
   fp_clamp(c);
 }
-
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 /* About this file...
 
@@ -2803,16 +2608,14 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 #define COMBA_FINI
 
 /* this should multiply i and j  */
-#define MULADD(i, j)                              \
-  asm(                                            \
-      "movl  %6,%%eax     \n\t"                   \
-      "mull  %7           \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "adcl  %%edx,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) \
-      : "%eax", "%edx", "cc");
+#define MULADD(i, j)            \
+  asm(                          \
+      "movl  %6,%%eax     \n\t" \
+      "mull  %7           \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) : "%eax", "%edx", "cc");
 
 #elif defined(TFM_X86_64)
 /* x86-64 optimized */
@@ -2845,16 +2648,14 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 #define COMBA_FINI
 
 /* this should multiply i and j  */
-#define MULADD(i, j)                              \
-  asm(                                            \
-      "movq  %6,%%rax     \n\t"                   \
-      "mulq  %7           \n\t"                   \
-      "addq  %%rax,%0     \n\t"                   \
-      "adcq  %%rdx,%1     \n\t"                   \
-      "adcq  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "g"(i), "g"(j) \
-      : "%rax", "%rdx", "cc");
+#define MULADD(i, j)            \
+  asm(                          \
+      "movq  %6,%%rax     \n\t" \
+      "mulq  %7           \n\t" \
+      "addq  %%rax,%0     \n\t" \
+      "adcq  %%rdx,%1     \n\t" \
+      "adcq  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "g"(i), "g"(j) : "%rax", "%rdx", "cc");
 
 #elif defined(TFM_SSE2)
 /* use SSE2 optimizations */
@@ -2888,20 +2689,18 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
   asm("emms");
 
 /* this should multiply i and j  */
-#define MULADD(i, j)                              \
-  asm(                                            \
-      "movd  %6,%%mm0     \n\t"                   \
-      "movd  %7,%%mm1     \n\t"                   \
-      "pmuludq %%mm1,%%mm0\n\t"                   \
-      "movd  %%mm0,%%eax  \n\t"                   \
-      "psrlq $32,%%mm0    \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "movd  %%mm0,%%eax  \n\t"                   \
-      "adcl  %%eax,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) \
-      : "%eax", "cc");
+#define MULADD(i, j)            \
+  asm(                          \
+      "movd  %6,%%mm0     \n\t" \
+      "movd  %7,%%mm1     \n\t" \
+      "pmuludq %%mm1,%%mm0\n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "psrlq $32,%%mm0    \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "adcl  %%eax,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) : "%eax", "cc");
 
 #elif defined(TFM_ARM)
 /* ARM code */
@@ -2927,19 +2726,13 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 
 #define COMBA_FINI
 
-#define MULADD(i, j)                              \
-  asm(                                            \
-      "  UMULL  r0,r1,%6,%7           \n\t"       \
-                                                  \
-      "  ADDS   %0,%0,r0              \n\t"       \
-                                                  \
-      "  ADCS   %1,%1,r1              \n\t"       \
-                                                  \
-      "  ADC    %2,%2,#0              \n\t"       \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r0", "r1", "cc");
+#define MULADD(i, j)                        \
+  asm(                                      \
+      "  UMULL  r0,r1,%6,%7           \n\t" \
+      "  ADDS   %0,%0,r0              \n\t" \
+      "  ADCS   %1,%1,r1              \n\t" \
+      "  ADC    %2,%2,#0              \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r0", "r1", "cc");
 
 #elif defined(TFM_PPC32)
 /* For 32-bit PPC */
@@ -2966,17 +2759,14 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 #define COMBA_FINI
 
 /* untested: will mulhwu change the flags?  Docs say no */
-#define MULADD(i, j)                              \
-  asm(                                            \
-      " mullw  16,%6,%7       \n\t"               \
-      " addc   %0,%0,16       \n\t"               \
-      " mulhwu 16,%6,%7       \n\t"               \
-      " adde   %1,%1,16       \n\t"               \
-      " addze  %2,%2          \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "16");
+#define MULADD(i, j)                \
+  asm(                              \
+      " mullw  16,%6,%7       \n\t" \
+      " addc   %0,%0,16       \n\t" \
+      " mulhwu 16,%6,%7       \n\t" \
+      " adde   %1,%1,16       \n\t" \
+      " addze  %2,%2          \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "16");
 
 #elif defined(TFM_PPC64)
 /* For 64-bit PPC */
@@ -3003,17 +2793,14 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 #define COMBA_FINI
 
 /* untested: will mulhdu change the flags?  Docs say no */
-#define MULADD(i, j)                              \
-  asm(                                            \
-      " mulld  r16,%6,%7       \n\t"              \
-      " addc   %0,%0,16       \n\t"               \
-      " mulhdu r16,%6,%7       \n\t"              \
-      " adde   %1,%1,16       \n\t"               \
-      " addze  %2,%2          \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r16");
+#define MULADD(i, j)                 \
+  asm(                               \
+      " mulld  r16,%6,%7       \n\t" \
+      " addc   %0,%0,16       \n\t"  \
+      " mulhdu r16,%6,%7       \n\t" \
+      " adde   %1,%1,16       \n\t"  \
+      " addze  %2,%2          \n\t"  \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r16");
 
 #elif defined(TFM_AVR32)
 
@@ -3040,16 +2827,13 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 
 #define COMBA_FINI
 
-#define MULADD(i, j)                              \
-  asm(                                            \
-      " mulu.d r2,%6,%7        \n\t"              \
-      " add    %0,r2           \n\t"              \
-      " adc    %1,%1,r3        \n\t"              \
-      " acr    %2              \n\t"              \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r2", "r3");
+#define MULADD(i, j)                 \
+  asm(                               \
+      " mulu.d r2,%6,%7        \n\t" \
+      " add    %0,r2           \n\t" \
+      " adc    %1,%1,r3        \n\t" \
+      " acr    %2              \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r2", "r3");
 
 #elif defined(TFM_MIPS)
 
@@ -3074,23 +2858,20 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 
 #define COMBA_FINI
 
-#define MULADD(i, j)                              \
-  asm(                                            \
-      " multu  %6,%7          \n\t"               \
-      " mflo   $12            \n\t"               \
-      " mfhi   $13            \n\t"               \
-      " addu    %0,%0,$12     \n\t"               \
-      " sltu   $12,%0,$12     \n\t"               \
-      " addu    %1,%1,$13     \n\t"               \
-      " sltu   $13,%1,$13     \n\t"               \
-      " addu    %1,%1,$12     \n\t"               \
-      " sltu   $12,%1,$12     \n\t"               \
-      " addu    %2,%2,$13     \n\t"               \
-      " addu    %2,%2,$12     \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "$12", "$13");
+#define MULADD(i, j)                \
+  asm(                              \
+      " multu  %6,%7          \n\t" \
+      " mflo   $12            \n\t" \
+      " mfhi   $13            \n\t" \
+      " addu    %0,%0,$12     \n\t" \
+      " sltu   $12,%0,$12     \n\t" \
+      " addu    %1,%1,$13     \n\t" \
+      " sltu   $13,%1,$13     \n\t" \
+      " addu    %1,%1,$12     \n\t" \
+      " sltu   $12,%1,$12     \n\t" \
+      " addu    %2,%2,$13     \n\t" \
+      " addu    %2,%2,$12     \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "$12", "$13");
 
 #else
 /* ISO C code */
@@ -3132,10 +2913,11 @@ void fp_mul_2d(fp_int *a, int b, fp_int *c)
 #ifndef TFM_DEFINES
 
 /* generic PxQ multiplier */
-void fp_mul_comba(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba(const fp_int *A, const fp_int *B, fp_int *C)
 {
   int ix, iy, iz, tx, ty, pa;
-  fp_digit c0, c1, c2, *tmpx, *tmpy;
+  const fp_digit *tmpx, *tmpy;
+  fp_digit c0, c1, c2;
   fp_int tmp, *dst;
 
   COMBA_START;
@@ -3170,8 +2952,8 @@ void fp_mul_comba(fp_int *A, fp_int *B, fp_int *C)
     tmpy = B->dp + ty;
 
     /* this is the number of times the loop will iterrate, essentially its
-         while (tx++ < a->used && ty-- >= 0) { ... }
-       */
+       while (tx++ < a->used && ty-- >= 0) { ... }
+     */
     iy = MIN(A->used - tx, ty + 1);
 
     /* execute loop */
@@ -3196,11 +2978,13 @@ void fp_mul_comba(fp_int *A, fp_int *B, fp_int *C)
 
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL12) && FP_SIZE >= 24
-void fp_mul_comba12(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba12(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[24];
 
@@ -3429,11 +3213,13 @@ void fp_mul_comba12(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL17) && FP_SIZE >= 34
-void fp_mul_comba17(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba17(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[34];
 
@@ -3837,11 +3623,13 @@ void fp_mul_comba17(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL20) && FP_SIZE >= 40
-void fp_mul_comba20(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba20(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[40];
 
@@ -4374,11 +4162,13 @@ void fp_mul_comba20(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL24) && FP_SIZE >= 48
-void fp_mul_comba24(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba24(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[48];
 
@@ -5111,11 +4901,13 @@ void fp_mul_comba24(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL28) && FP_SIZE >= 56
-void fp_mul_comba28(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba28(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[56];
 
@@ -6080,11 +5872,13 @@ void fp_mul_comba28(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL3) && FP_SIZE >= 6
-void fp_mul_comba3(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba3(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[6];
 
@@ -6124,11 +5918,13 @@ void fp_mul_comba3(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL32) && FP_SIZE >= 64
-void fp_mul_comba32(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba32(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[64];
   int out_size;
@@ -7395,11 +7191,13 @@ void fp_mul_comba32(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL4) && FP_SIZE >= 8
-void fp_mul_comba4(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba4(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[8];
 
@@ -7452,11 +7250,13 @@ void fp_mul_comba4(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL48) && FP_SIZE >= 96
-void fp_mul_comba48(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba48(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[96];
   int out_size;
@@ -10147,11 +9947,13 @@ void fp_mul_comba48(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-////#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL6) && FP_SIZE >= 12
-void fp_mul_comba6(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba6(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[12];
 
@@ -10236,11 +10038,13 @@ void fp_mul_comba6(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL64) && FP_SIZE >= 128
-void fp_mul_comba64(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba64(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[128];
   int out_size;
@@ -14867,11 +14671,13 @@ void fp_mul_comba64(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL7) && FP_SIZE >= 14
-void fp_mul_comba7(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba7(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[14];
 
@@ -14975,11 +14781,13 @@ void fp_mul_comba7(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL8) && FP_SIZE >= 16
-void fp_mul_comba8(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba8(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[16];
 
@@ -15104,11 +14912,13 @@ void fp_mul_comba8(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_MUL9) && FP_SIZE >= 18
-void fp_mul_comba9(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba9(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[18];
 
@@ -15256,11 +15066,13 @@ void fp_mul_comba9(fp_int *A, fp_int *B, fp_int *C)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_mul_comba.c"
+#include "fp_mul_comba.c"
+#endif
 
 #if defined(TFM_SMALL_SET)
-void fp_mul_comba_small(fp_int *A, fp_int *B, fp_int *C)
+void fp_mul_comba_small(const fp_int *A, const fp_int *B, fp_int *C)
 {
   fp_digit c0, c1, c2, at[32];
   switch (MAX(A->used, B->used))
@@ -17727,7 +17539,7 @@ void fp_mul_comba_small(fp_int *A, fp_int *B, fp_int *C)
 #endif
 
 /* c = a * b */
-void fp_mul_d(fp_int *a, fp_digit b, fp_int *c)
+void fp_mul_d(const fp_int *a, fp_digit b, fp_int *c)
 {
   fp_word w;
   int x, oldused;
@@ -17755,7 +17567,7 @@ void fp_mul_d(fp_int *a, fp_digit b, fp_int *c)
 }
 
 /* d = a * b (mod c) */
-int fp_mulmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
+int fp_mulmod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d)
 {
   fp_int tmp;
   fp_zero(&tmp);
@@ -17764,7 +17576,7 @@ int fp_mulmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d)
 }
 
 /* c = (a, b) */
-void fp_gcd(fp_int *a, fp_int *b, fp_int *c)
+void fp_gcd(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int u, v, r;
 
@@ -17781,8 +17593,8 @@ void fp_gcd(fp_int *a, fp_int *b, fp_int *c)
   }
 
   /* optimized.  At this point if a == 0 then
-    * b must equal zero too
-    */
+   * b must equal zero too
+   */
   if (fp_iszero(a) == 1)
   {
     fp_zero(c);
@@ -17811,7 +17623,7 @@ void fp_gcd(fp_int *a, fp_int *b, fp_int *c)
   fp_copy(&u, c);
 }
 
-static int fp_invmod_slow(fp_int *a, fp_int *b, fp_int *c)
+static int s_fp_invmod_slow(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int x, y, u, v, A, B, C, D;
   int res;
@@ -17934,7 +17746,7 @@ top:
 }
 
 /* c = 1/a (mod b) for odd b only */
-int fp_invmod(fp_int *a, fp_int *b, fp_int *c)
+int fp_invmod(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int x, y, u, v, B, D;
   int neg;
@@ -17942,7 +17754,7 @@ int fp_invmod(fp_int *a, fp_int *b, fp_int *c)
   /* 2. [modified] b must be odd   */
   if (fp_iseven(b) == FP_YES)
   {
-    return fp_invmod_slow(a, b, c);
+    return s_fp_invmod_slow(a, b, c);
   }
 
   /* init all our temps */
@@ -18035,30 +17847,10 @@ top:
   return FP_OKAY;
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
-int fp_isprime(fp_int *a)
+int fp_isprime(const fp_int *a)
 {
   return fp_isprime_ex(a, 8);
 }
-
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 /* a few primes */
 static const fp_digit primes[FP_PRIME_SIZE] = {
@@ -18098,7 +17890,7 @@ static const fp_digit primes[FP_PRIME_SIZE] = {
     0x05F3, 0x05FB, 0x0607, 0x060D, 0x0611, 0x0617, 0x061F, 0x0623,
     0x062B, 0x062F, 0x063D, 0x0641, 0x0647, 0x0649, 0x064D, 0x0653};
 
-int fp_isprime_ex(fp_int *a, int t)
+int fp_isprime_ex(const fp_int *a, int t)
 {
   fp_int b;
   fp_digit d;
@@ -18134,7 +17926,7 @@ int fp_isprime_ex(fp_int *a, int t)
 }
 
 /* c = [a, b] */
-void fp_lcm(fp_int *a, fp_int *b, fp_int *c)
+void fp_lcm(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int t1, t2;
 
@@ -18153,14 +17945,14 @@ void fp_lcm(fp_int *a, fp_int *b, fp_int *c)
   }
 }
 
-/* Miller-Rabin test of "a" to the base of "b" as described in 
+/* Miller-Rabin test of "a" to the base of "b" as described in
  * HAC pp. 139 Algorithm 4.24
  *
  * Sets result to 0 if definitely composite or 1 if probably prime.
- * Randomly the chance of error is no more than 1/4 and often 
+ * Randomly the chance of error is no more than 1/4 and often
  * very much lower.
  */
-void fp_prime_miller_rabin(fp_int *a, fp_int *b, int *result)
+void fp_prime_miller_rabin(const fp_int *a, const fp_int *b, int *result)
 {
   fp_int n1, y, r;
   int s, j;
@@ -18221,115 +18013,106 @@ void fp_prime_miller_rabin(fp_int *a, fp_int *b, int *result)
   *result = FP_YES;
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
 #define fp_on_bitnum(a, bitnum) \
-    a->dp[(bitnum) >> DIGIT_SHIFT] |= (fp_digit)1 << ((bitnum) & (DIGIT_BIT-1))
+  a->dp[(bitnum) >> DIGIT_SHIFT] |= (fp_digit)1 << ((bitnum) & (DIGIT_BIT - 1))
 
 #define fp_off_bitnum(a, bitnum) \
-    a->dp[(bitnum) >> DIGIT_SHIFT] &= ~((fp_digit)1 << ((bitnum) & (DIGIT_BIT-1)))
+  a->dp[(bitnum) >> DIGIT_SHIFT] &= ~((fp_digit)1 << ((bitnum) & (DIGIT_BIT - 1)))
 
 /* This is possibly the mother of all prime generation functions, muahahahahaha! */
 int fp_prime_random_ex(fp_int *a, int t, int size, int flags, tfm_prime_callback cb, void *dat)
 {
-   fp_digit maskAND_msb, maskOR_lsb;
-   int res, bsize, dsize;
-   unsigned char buf[FP_SIZE * sizeof(fp_digit)];
+  fp_digit maskAND_msb, maskOR_lsb;
+  int res, bsize, dsize;
+  unsigned char buf[FP_SIZE * sizeof(fp_digit)];
 
-   /* sanity check the input */
-   if (size <= 1 || cb == NULL || t <= 0 || t > FP_PRIME_SIZE) {
+  /* sanity check the input */
+  if (size <= 1 || cb == NULL || t <= 0 || t > FP_PRIME_SIZE)
+  {
+    return FP_VAL;
+  }
+
+  /* TFM_PRIME_SAFE implies TFM_PRIME_BBS */
+  if (flags & TFM_PRIME_SAFE)
+  {
+    flags |= TFM_PRIME_BBS;
+  }
+
+  /* calc the size in fp_digit */
+  dsize = (size + DIGIT_BIT - 1) >> DIGIT_SHIFT;
+  /* calc the size in bytes */
+  bsize = (size + 7) >> 3;
+
+  /* calc the maskAND value for the MSbyte */
+  maskAND_msb = FP_MASK >> ((DIGIT_BIT - size) & (DIGIT_BIT - 1));
+
+  /* get the maskOR_lsb */
+  maskOR_lsb = 1;
+  if (flags & TFM_PRIME_BBS)
+  {
+    maskOR_lsb |= 3;
+  }
+
+  do
+  {
+    /* read the bytes */
+    if (cb(buf, bsize, dat) != bsize)
+    {
       return FP_VAL;
-   }
+    }
+    fp_read_unsigned_bin(a, buf, bsize);
 
-   /* TFM_PRIME_SAFE implies TFM_PRIME_BBS */
-   if (flags & TFM_PRIME_SAFE) {
-      flags |= TFM_PRIME_BBS;
-   }
+    /* make sure the MSbyte has the required number of bits */
+    a->dp[dsize - 1] &= maskAND_msb;
 
-   /* calc the size in fp_digit */
-   dsize = (size + DIGIT_BIT - 1) >> DIGIT_SHIFT;
-   /* calc the size in bytes */
-   bsize = (size + 7) >> 3;
+    /* Force a->used as well, it could be smaller if the highest bits were
+       generated as 0 by the callback. */
+    a->used = dsize;
 
-   /* calc the maskAND value for the MSbyte */
-   maskAND_msb = FP_MASK >> ((DIGIT_BIT - size) & (DIGIT_BIT-1));
+    /* modify the LSbyte as requested */
+    a->dp[0] |= maskOR_lsb;
 
-   /* get the maskOR_lsb */
-   maskOR_lsb         = 1;
-   if (flags & TFM_PRIME_BBS) {
-      maskOR_lsb     |= 3;
-   }
+    /* turn on the MSbit to force the requested magnitude */
+    fp_on_bitnum(a, size - 1);
 
-   do {
-      /* read the bytes */
-      if (cb(buf, bsize, dat) != bsize) {
-         return FP_VAL;
-      }
-      fp_read_unsigned_bin(a, buf, bsize);
+    /* modify the 2nd MSBit */
+    if (flags & TFM_PRIME_2MSB_ON)
+    {
+      fp_on_bitnum(a, size - 2);
+    }
+    else if (flags & TFM_PRIME_2MSB_OFF)
+    {
+      fp_off_bitnum(a, size - 2);
+    }
 
-      /* make sure the MSbyte has the required number of bits */
-      a->dp[dsize-1]    &= maskAND_msb;
+    /* is it prime? */
+    res = fp_isprime_ex(a, t);
+    if (res == FP_NO)
+      continue;
 
-      /* Force a->used as well, it could be smaller if the highest bits were
-         generated as 0 by the callback. */
-      a->used           = dsize;
-
-      /* modify the LSbyte as requested */
-      a->dp[0]          |= maskOR_lsb;
-
-      /* turn on the MSbit to force the requested magnitude */
-      fp_on_bitnum(a, size-1);
-
-      /* modify the 2nd MSBit */
-      if (flags & TFM_PRIME_2MSB_ON) {
-          fp_on_bitnum(a, size-2);
-      } else if (flags & TFM_PRIME_2MSB_OFF) {
-          fp_off_bitnum(a, size-2);
-      }
+    if (flags & TFM_PRIME_SAFE)
+    {
+      /* see if (a-1)/2 is prime */
+      fp_sub_d(a, 1, a);
+      fp_div_2(a, a);
 
       /* is it prime? */
       res = fp_isprime_ex(a, t);
-      if (res == FP_NO) continue;
+    }
+  } while (res == FP_NO);
 
-      if (flags & TFM_PRIME_SAFE) {
-         /* see if (a-1)/2 is prime */
-         fp_sub_d(a, 1, a);
-         fp_div_2(a, a);
+  if (flags & TFM_PRIME_SAFE)
+  {
+    /* restore a to the original value */
+    fp_mul_2(a, a);
+    fp_add_d(a, 1, a);
+  }
 
-         /* is it prime? */
-         res = fp_isprime_ex(a, t);
-      }
-   } while (res == FP_NO);
-
-   if (flags & TFM_PRIME_SAFE) {
-      /* restore a to the original value */
-      fp_mul_2(a, a);
-      fp_add_d(a, 1, a);
-   }
-
-   return FP_OKAY;
+  return FP_OKAY;
 }
 
-/* TomsFastMath, a fast ISO C bignum library.
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
-
 /* b = a*a  */
-void fp_sqr(fp_int *A, fp_int *B)
+void fp_sqr(const fp_int *A, fp_int *B)
 {
   int y, old_used;
 
@@ -18450,27 +18233,11 @@ void fp_sqr(fp_int *A, fp_int *B)
 #endif
   fp_sqr_comba(A, B);
 clean:
-{
-  /* now zero any excess digits on the destination 
-     * that we didn't write to 
-     */
-  register fp_digit *tmpb = B->dp + B->used;
   for (y = B->used; y < old_used; y++)
   {
-    *tmpb++ = 0;
+    B->dp[y] = 0;
   }
 }
-}
-
-/*
- *
- * This project is meant to fill in where LibTomMath
- * falls short.  That is speed ;-)
- *
- * This project is public domain and free for all purposes.
- *
- * Tom St Denis, tomstdenis@gmail.com
- */
 
 #if defined(TFM_PRESCOTT) && defined(TFM_SSE2)
 #undef TFM_SSE2
@@ -18502,64 +18269,54 @@ clean:
 
 #define COMBA_FINI
 
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      "movl  %6,%%eax     \n\t"           \
-      "mull  %%eax        \n\t"           \
-      "addl  %%eax,%0     \n\t"           \
-      "adcl  %%edx,%1     \n\t"           \
-      "adcl  $0,%2        \n\t"           \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i) \
-      : "%eax", "%edx", "cc");
+#define SQRADD(i, j)            \
+  asm(                          \
+      "movl  %6,%%eax     \n\t" \
+      "mull  %%eax        \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i) : "%eax", "%edx", "cc");
 
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      "movl  %6,%%eax     \n\t"                   \
-      "mull  %7           \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "adcl  %%edx,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "adcl  %%edx,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) \
-      : "%eax", "%edx", "cc");
+#define SQRADD2(i, j)           \
+  asm(                          \
+      "movl  %6,%%eax     \n\t" \
+      "mull  %7           \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) : "%eax", "%edx", "cc");
 
-#define SQRADDSC(i, j)                  \
-  asm(                                  \
-      "movl  %3,%%eax     \n\t"         \
-      "mull  %4           \n\t"         \
-      "movl  %%eax,%0     \n\t"         \
-      "movl  %%edx,%1     \n\t"         \
-      "xorl  %2,%2        \n\t"         \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2) \
-      : "g"(i), "g"(j)                  \
-      : "%eax", "%edx", "cc");
+#define SQRADDSC(i, j)          \
+  asm(                          \
+      "movl  %3,%%eax     \n\t" \
+      "mull  %4           \n\t" \
+      "movl  %%eax,%0     \n\t" \
+      "movl  %%edx,%1     \n\t" \
+      "xorl  %2,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "g"(i), "g"(j) : "%eax", "%edx", "cc");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      "movl  %6,%%eax     \n\t"                      \
-      "mull  %7           \n\t"                      \
-      "addl  %%eax,%0     \n\t"                      \
-      "adcl  %%edx,%1     \n\t"                      \
-      "adcl  $0,%2        \n\t"                      \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j) \
-      : "%eax", "%edx", "cc");
+#define SQRADDAC(i, j)          \
+  asm(                          \
+      "movl  %6,%%eax     \n\t" \
+      "mull  %7           \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j) : "%eax", "%edx", "cc");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      "addl %6,%0         \n\t"                                 \
-      "adcl %7,%1         \n\t"                                 \
-      "adcl %8,%2         \n\t"                                 \
-      "addl %6,%0         \n\t"                                 \
-      "adcl %7,%1         \n\t"                                 \
-      "adcl %8,%2         \n\t"                                 \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) \
-      : "cc");
+#define SQRADDDB                \
+  asm(                          \
+      "addl %6,%0         \n\t" \
+      "adcl %7,%1         \n\t" \
+      "adcl %8,%2         \n\t" \
+      "addl %6,%0         \n\t" \
+      "adcl %7,%1         \n\t" \
+      "adcl %8,%2         \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
 
 #elif defined(TFM_X86_64)
 /* x86-64 optimized */
@@ -18585,64 +18342,54 @@ clean:
 
 #define COMBA_FINI
 
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      "movq  %6,%%rax     \n\t"           \
-      "mulq  %%rax        \n\t"           \
-      "addq  %%rax,%0     \n\t"           \
-      "adcq  %%rdx,%1     \n\t"           \
-      "adcq  $0,%2        \n\t"           \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "x"(i) \
-      : "%rax", "%rdx", "cc");
+#define SQRADD(i, j)            \
+  asm(                          \
+      "movq  %6,%%rax     \n\t" \
+      "mulq  %%rax        \n\t" \
+      "addq  %%rax,%0     \n\t" \
+      "adcq  %%rdx,%1     \n\t" \
+      "adcq  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "x"(i) : "%rax", "%rdx", "cc");
 
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      "movq  %6,%%rax     \n\t"                   \
-      "mulq  %7           \n\t"                   \
-      "addq  %%rax,%0     \n\t"                   \
-      "adcq  %%rdx,%1     \n\t"                   \
-      "adcq  $0,%2        \n\t"                   \
-      "addq  %%rax,%0     \n\t"                   \
-      "adcq  %%rdx,%1     \n\t"                   \
-      "adcq  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "g"(i), "g"(j) \
-      : "%rax", "%rdx", "cc");
+#define SQRADD2(i, j)           \
+  asm(                          \
+      "movq  %6,%%rax     \n\t" \
+      "mulq  %7           \n\t" \
+      "addq  %%rax,%0     \n\t" \
+      "adcq  %%rdx,%1     \n\t" \
+      "adcq  $0,%2        \n\t" \
+      "addq  %%rax,%0     \n\t" \
+      "adcq  %%rdx,%1     \n\t" \
+      "adcq  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "g"(i), "g"(j) : "%rax", "%rdx", "cc");
 
-#define SQRADDSC(i, j)                  \
-  asm(                                  \
-      "movq  %3,%%rax     \n\t"         \
-      "mulq  %4           \n\t"         \
-      "movq  %%rax,%0     \n\t"         \
-      "movq  %%rdx,%1     \n\t"         \
-      "xorq  %2,%2        \n\t"         \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2) \
-      : "g"(i), "g"(j)                  \
-      : "%rax", "%rdx", "cc");
+#define SQRADDSC(i, j)          \
+  asm(                          \
+      "movq  %3,%%rax     \n\t" \
+      "mulq  %4           \n\t" \
+      "movq  %%rax,%0     \n\t" \
+      "movq  %%rdx,%1     \n\t" \
+      "xorq  %2,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "g"(i), "g"(j) : "%rax", "%rdx", "cc");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      "movq  %6,%%rax     \n\t"                      \
-      "mulq  %7           \n\t"                      \
-      "addq  %%rax,%0     \n\t"                      \
-      "adcq  %%rdx,%1     \n\t"                      \
-      "adcq  $0,%2        \n\t"                      \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j) \
-      : "%rax", "%rdx", "cc");
+#define SQRADDAC(i, j)          \
+  asm(                          \
+      "movq  %6,%%rax     \n\t" \
+      "mulq  %7           \n\t" \
+      "addq  %%rax,%0     \n\t" \
+      "adcq  %%rdx,%1     \n\t" \
+      "adcq  $0,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j) : "%rax", "%rdx", "cc");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      "addq %6,%0         \n\t"                                 \
-      "adcq %7,%1         \n\t"                                 \
-      "adcq %8,%2         \n\t"                                 \
-      "addq %6,%0         \n\t"                                 \
-      "adcq %7,%1         \n\t"                                 \
-      "adcq %8,%2         \n\t"                                 \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) \
-      : "cc");
+#define SQRADDDB                \
+  asm(                          \
+      "addq %6,%0         \n\t" \
+      "adcq %7,%1         \n\t" \
+      "adcq %8,%2         \n\t" \
+      "addq %6,%0         \n\t" \
+      "adcq %7,%1         \n\t" \
+      "adcq %8,%2         \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
 
 #elif defined(TFM_SSE2)
 
@@ -18669,76 +18416,67 @@ clean:
 #define COMBA_FINI \
   asm("emms");
 
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      "movd  %6,%%mm0     \n\t"           \
-      "pmuludq %%mm0,%%mm0\n\t"           \
-      "movd  %%mm0,%%eax  \n\t"           \
-      "psrlq $32,%%mm0    \n\t"           \
-      "addl  %%eax,%0     \n\t"           \
-      "movd  %%mm0,%%eax  \n\t"           \
-      "adcl  %%eax,%1     \n\t"           \
-      "adcl  $0,%2        \n\t"           \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i) \
-      : "%eax", "cc");
+#define SQRADD(i, j)            \
+  asm(                          \
+      "movd  %6,%%mm0     \n\t" \
+      "pmuludq %%mm0,%%mm0\n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "psrlq $32,%%mm0    \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "adcl  %%eax,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i) : "%eax", "cc");
 
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      "movd  %6,%%mm0     \n\t"                   \
-      "movd  %7,%%mm1     \n\t"                   \
-      "pmuludq %%mm1,%%mm0\n\t"                   \
-      "movd  %%mm0,%%eax  \n\t"                   \
-      "psrlq $32,%%mm0    \n\t"                   \
-      "movd  %%mm0,%%edx  \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "adcl  %%edx,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      "addl  %%eax,%0     \n\t"                   \
-      "adcl  %%edx,%1     \n\t"                   \
-      "adcl  $0,%2        \n\t"                   \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) \
-      : "%eax", "%edx", "cc");
+#define SQRADD2(i, j)           \
+  asm(                          \
+      "movd  %6,%%mm0     \n\t" \
+      "movd  %7,%%mm1     \n\t" \
+      "pmuludq %%mm1,%%mm0\n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "psrlq $32,%%mm0    \n\t" \
+      "movd  %%mm0,%%edx  \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j) : "%eax", "%edx", "cc");
 
-#define SQRADDSC(i, j)                  \
-  asm(                                  \
-      "movd  %6,%%mm0     \n\t"         \
-      "movd  %7,%%mm1     \n\t"         \
-      "pmuludq %%mm1,%%mm0\n\t"         \
-      "movd  %%mm0,%0     \n\t"         \
-      "psrlq $32,%%mm0    \n\t"         \
-      "movd  %%mm0,%1     \n\t"         \
-      "xorl  %2,%2        \n\t"         \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2) \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "m"(i), "m"(j));
+#define SQRADDSC(i, j)          \
+  asm(                          \
+      "movd  %6,%%mm0     \n\t" \
+      "movd  %7,%%mm1     \n\t" \
+      "pmuludq %%mm1,%%mm0\n\t" \
+      "movd  %%mm0,%0     \n\t" \
+      "psrlq $32,%%mm0    \n\t" \
+      "movd  %%mm0,%1     \n\t" \
+      "xorl  %2,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "m"(i), "m"(j));
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      "movd  %6,%%mm0     \n\t"                      \
-      "movd  %7,%%mm1     \n\t"                      \
-      "pmuludq %%mm1,%%mm0\n\t"                      \
-      "movd  %%mm0,%%eax  \n\t"                      \
-      "psrlq $32,%%mm0    \n\t"                      \
-      "movd  %%mm0,%%edx  \n\t"                      \
-      "addl  %%eax,%0     \n\t"                      \
-      "adcl  %%edx,%1     \n\t"                      \
-      "adcl  $0,%2        \n\t"                      \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "m"(i), "m"(j) \
-      : "%eax", "%edx", "cc");
+#define SQRADDAC(i, j)          \
+  asm(                          \
+      "movd  %6,%%mm0     \n\t" \
+      "movd  %7,%%mm1     \n\t" \
+      "pmuludq %%mm1,%%mm0\n\t" \
+      "movd  %%mm0,%%eax  \n\t" \
+      "psrlq $32,%%mm0    \n\t" \
+      "movd  %%mm0,%%edx  \n\t" \
+      "addl  %%eax,%0     \n\t" \
+      "adcl  %%edx,%1     \n\t" \
+      "adcl  $0,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "m"(i), "m"(j) : "%eax", "%edx", "cc");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      "addl %6,%0         \n\t"                                 \
-      "adcl %7,%1         \n\t"                                 \
-      "adcl %8,%2         \n\t"                                 \
-      "addl %6,%0         \n\t"                                 \
-      "adcl %7,%1         \n\t"                                 \
-      "adcl %8,%2         \n\t"                                 \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) \
-      : "cc");
+#define SQRADDDB                \
+  asm(                          \
+      "addl %6,%0         \n\t" \
+      "adcl %7,%1         \n\t" \
+      "adcl %8,%2         \n\t" \
+      "addl %6,%0         \n\t" \
+      "adcl %7,%1         \n\t" \
+      "adcl %8,%2         \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
 
 #elif defined(TFM_ARM)
 
@@ -18769,79 +18507,46 @@ clean:
 #define SQRADD(i, j)                           \
   asm(                                         \
       "  UMULL  r0,r1,%6,%6              \n\t" \
-                                               \
       "  ADDS   %0,%0,r0                 \n\t" \
-                                               \
       "  ADCS   %1,%1,r1                 \n\t" \
-                                               \
       "  ADC    %2,%2,#0                 \n\t" \
-                                               \
-      : "=r"(c0), "=r"(c1), "=r"(c2)           \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i)      \
-      : "r0", "r1", "cc");
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i) : "r0", "r1", "cc");
 
 /* for squaring some of the terms are doubled... */
-#define SQRADD2(i, j)                             \
+#define SQRADD2(i, j)                          \
+  asm(                                         \
+      "  UMULL  r0,r1,%6,%7              \n\t" \
+      "  ADDS   %0,%0,r0                 \n\t" \
+      "  ADCS   %1,%1,r1                 \n\t" \
+      "  ADC    %2,%2,#0                 \n\t" \
+      "  ADDS   %0,%0,r0                 \n\t" \
+      "  ADCS   %1,%1,r1                 \n\t" \
+      "  ADC    %2,%2,#0                 \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r0", "r1", "cc");
+
+#define SQRADDSC(i, j)                         \
+  asm(                                         \
+      "  UMULL  %0,%1,%6,%7              \n\t" \
+      "  SUB    %2,%2,%2                 \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "cc");
+
+#define SQRADDAC(i, j)                         \
+  asm(                                         \
+      "  UMULL  r0,r1,%6,%7              \n\t" \
+      "  ADDS   %0,%0,r0                 \n\t" \
+      "  ADCS   %1,%1,r1                 \n\t" \
+      "  ADC    %2,%2,#0                 \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "r0", "r1", "cc");
+
+#define SQRADDDB                                  \
   asm(                                            \
-      "  UMULL  r0,r1,%6,%7              \n\t"    \
-                                                  \
-      "  ADDS   %0,%0,r0                 \n\t"    \
-                                                  \
-      "  ADCS   %1,%1,r1                 \n\t"    \
-                                                  \
-      "  ADC    %2,%2,#0                 \n\t"    \
-                                                  \
-      "  ADDS   %0,%0,r0                 \n\t"    \
-                                                  \
-      "  ADCS   %1,%1,r1                 \n\t"    \
-                                                  \
-      "  ADC    %2,%2,#0                 \n\t"    \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r0", "r1", "cc");
-
-#define SQRADDSC(i, j)                               \
-  asm(                                               \
-      "  UMULL  %0,%1,%6,%7              \n\t"       \
-                                                     \
-      "  SUB    %2,%2,%2                 \n\t"       \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "cc");
-
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      "  UMULL  r0,r1,%6,%7              \n\t"       \
-                                                     \
-      "  ADDS   %0,%0,r0                 \n\t"       \
-                                                     \
-      "  ADCS   %1,%1,r1                 \n\t"       \
-                                                     \
-      "  ADC    %2,%2,#0                 \n\t"       \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "r0", "r1", "cc");
-
-#define SQRADDDB                                                \
-  asm(                                                          \
-      "  ADDS  %0,%0,%3                     \n\t"               \
-                                                                \
-      "  ADCS  %1,%1,%4                     \n\t"               \
-                                                                \
-      "  ADC   %2,%2,%5                     \n\t"               \
-                                                                \
-      "  ADDS  %0,%0,%3                     \n\t"               \
-                                                                \
-      "  ADCS  %1,%1,%4                     \n\t"               \
-                                                                \
-      "  ADC   %2,%2,%5                     \n\t"               \
-                                                                \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) \
-      : "cc");
+      "  ADDS  %0,%0,%3                     \n\t" \
+      "  ADCS  %1,%1,%4                     \n\t" \
+      "  ADC   %2,%2,%5                     \n\t" \
+      "  ADDS  %0,%0,%3                     \n\t" \
+      "  ADCS  %1,%1,%4                     \n\t" \
+      "  ADC   %2,%2,%5                     \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) : "cc");
 
 #elif defined(TFM_PPC32)
 
@@ -18869,68 +18574,53 @@ clean:
 #define COMBA_FINI
 
 /* multiplies point i and j, updates carry "c1" and digit c2 */
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      " mullw  16,%6,%6       \n\t"       \
-      " addc   %0,%0,16       \n\t"       \
-      " mulhwu 16,%6,%6       \n\t"       \
-      " adde   %1,%1,16       \n\t"       \
-      " addze  %2,%2          \n\t"       \
-                                          \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i) \
-      : "16", "cc");
+#define SQRADD(i, j)                \
+  asm(                              \
+      " mullw  16,%6,%6       \n\t" \
+      " addc   %0,%0,16       \n\t" \
+      " mulhwu 16,%6,%6       \n\t" \
+      " adde   %1,%1,16       \n\t" \
+      " addze  %2,%2          \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i) : "16", "cc");
 
 /* for squaring some of the terms are doubled... */
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      " mullw  16,%6,%7       \n\t"               \
-      " mulhwu 17,%6,%7       \n\t"               \
-      " addc   %0,%0,16       \n\t"               \
-      " adde   %1,%1,17       \n\t"               \
-      " addze  %2,%2          \n\t"               \
-      " addc   %0,%0,16       \n\t"               \
-      " adde   %1,%1,17       \n\t"               \
-      " addze  %2,%2          \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "16", "17", "cc");
+#define SQRADD2(i, j)               \
+  asm(                              \
+      " mullw  16,%6,%7       \n\t" \
+      " mulhwu 17,%6,%7       \n\t" \
+      " addc   %0,%0,16       \n\t" \
+      " adde   %1,%1,17       \n\t" \
+      " addze  %2,%2          \n\t" \
+      " addc   %0,%0,16       \n\t" \
+      " adde   %1,%1,17       \n\t" \
+      " addze  %2,%2          \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "16", "17", "cc");
 
-#define SQRADDSC(i, j)                               \
-  asm(                                               \
-      " mullw  %0,%6,%7        \n\t"                 \
-      " mulhwu %1,%6,%7        \n\t"                 \
-      " xor    %2,%2,%2        \n\t"                 \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "cc");
+#define SQRADDSC(i, j)               \
+  asm(                               \
+      " mullw  %0,%6,%7        \n\t" \
+      " mulhwu %1,%6,%7        \n\t" \
+      " xor    %2,%2,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "cc");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      " mullw  16,%6,%7       \n\t"                  \
-      " addc   %0,%0,16       \n\t"                  \
-      " mulhwu 16,%6,%7       \n\t"                  \
-      " adde   %1,%1,16       \n\t"                  \
-      " addze  %2,%2          \n\t"                  \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "16", "cc");
+#define SQRADDAC(i, j)              \
+  asm(                              \
+      " mullw  16,%6,%7       \n\t" \
+      " addc   %0,%0,16       \n\t" \
+      " mulhwu 16,%6,%7       \n\t" \
+      " adde   %1,%1,16       \n\t" \
+      " addze  %2,%2          \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "16", "cc");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      " addc   %0,%0,%3        \n\t"                            \
-      " adde   %1,%1,%4        \n\t"                            \
-      " adde   %2,%2,%5        \n\t"                            \
-      " addc   %0,%0,%3        \n\t"                            \
-      " adde   %1,%1,%4        \n\t"                            \
-      " adde   %2,%2,%5        \n\t"                            \
-                                                                \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) \
-      : "cc");
+#define SQRADDDB                     \
+  asm(                               \
+      " addc   %0,%0,%3        \n\t" \
+      " adde   %1,%1,%4        \n\t" \
+      " adde   %2,%2,%5        \n\t" \
+      " addc   %0,%0,%3        \n\t" \
+      " adde   %1,%1,%4        \n\t" \
+      " adde   %2,%2,%5        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) : "cc");
 
 #elif defined(TFM_PPC64)
 /* PPC64 */
@@ -18957,68 +18647,53 @@ clean:
 #define COMBA_FINI
 
 /* multiplies point i and j, updates carry "c1" and digit c2 */
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      " mulld  r16,%6,%6       \n\t"      \
-      " addc   %0,%0,r16       \n\t"      \
-      " mulhdu r16,%6,%6       \n\t"      \
-      " adde   %1,%1,r16       \n\t"      \
-      " addze  %2,%2          \n\t"       \
-                                          \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i) \
-      : "r16", "cc");
+#define SQRADD(i, j)                 \
+  asm(                               \
+      " mulld  r16,%6,%6       \n\t" \
+      " addc   %0,%0,r16       \n\t" \
+      " mulhdu r16,%6,%6       \n\t" \
+      " adde   %1,%1,r16       \n\t" \
+      " addze  %2,%2          \n\t"  \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i) : "r16", "cc");
 
 /* for squaring some of the terms are doubled... */
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      " mulld  r16,%6,%7       \n\t"              \
-      " mulhdu r17,%6,%7       \n\t"              \
-      " addc   %0,%0,r16       \n\t"              \
-      " adde   %1,%1,r17       \n\t"              \
-      " addze  %2,%2          \n\t"               \
-      " addc   %0,%0,r16       \n\t"              \
-      " adde   %1,%1,r17       \n\t"              \
-      " addze  %2,%2          \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r16", "r17", "cc");
+#define SQRADD2(i, j)                \
+  asm(                               \
+      " mulld  r16,%6,%7       \n\t" \
+      " mulhdu r17,%6,%7       \n\t" \
+      " addc   %0,%0,r16       \n\t" \
+      " adde   %1,%1,r17       \n\t" \
+      " addze  %2,%2          \n\t"  \
+      " addc   %0,%0,r16       \n\t" \
+      " adde   %1,%1,r17       \n\t" \
+      " addze  %2,%2          \n\t"  \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r16", "r17", "cc");
 
-#define SQRADDSC(i, j)                               \
-  asm(                                               \
-      " mulld  %0,%6,%7        \n\t"                 \
-      " mulhdu %1,%6,%7        \n\t"                 \
-      " xor    %2,%2,%2        \n\t"                 \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "cc");
+#define SQRADDSC(i, j)               \
+  asm(                               \
+      " mulld  %0,%6,%7        \n\t" \
+      " mulhdu %1,%6,%7        \n\t" \
+      " xor    %2,%2,%2        \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "cc");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      " mulld  r16,%6,%7       \n\t"                 \
-      " addc   %0,%0,r16       \n\t"                 \
-      " mulhdu r16,%6,%7       \n\t"                 \
-      " adde   %1,%1,r16       \n\t"                 \
-      " addze  %2,%2          \n\t"                  \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "r16", "cc");
+#define SQRADDAC(i, j)               \
+  asm(                               \
+      " mulld  r16,%6,%7       \n\t" \
+      " addc   %0,%0,r16       \n\t" \
+      " mulhdu r16,%6,%7       \n\t" \
+      " adde   %1,%1,r16       \n\t" \
+      " addze  %2,%2          \n\t"  \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "r16", "cc");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      " addc   %0,%0,%3        \n\t"                            \
-      " adde   %1,%1,%4        \n\t"                            \
-      " adde   %2,%2,%5        \n\t"                            \
-      " addc   %0,%0,%3        \n\t"                            \
-      " adde   %1,%1,%4        \n\t"                            \
-      " adde   %2,%2,%5        \n\t"                            \
-                                                                \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) \
-      : "cc");
+#define SQRADDDB                     \
+  asm(                               \
+      " addc   %0,%0,%3        \n\t" \
+      " adde   %1,%1,%4        \n\t" \
+      " adde   %2,%2,%5        \n\t" \
+      " addc   %0,%0,%3        \n\t" \
+      " adde   %1,%1,%4        \n\t" \
+      " adde   %2,%2,%5        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) : "cc");
 
 #elif defined(TFM_AVR32)
 
@@ -19046,66 +18721,51 @@ clean:
 #define COMBA_FINI
 
 /* multiplies point i and j, updates carry "c1" and digit c2 */
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      " mulu.d r2,%6,%6       \n\t"       \
-      " add    %0,%0,r2       \n\t"       \
-      " adc    %1,%1,r3       \n\t"       \
-      " acr    %2             \n\t"       \
-                                          \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i) \
-      : "r2", "r3");
+#define SQRADD(i, j)                \
+  asm(                              \
+      " mulu.d r2,%6,%6       \n\t" \
+      " add    %0,%0,r2       \n\t" \
+      " adc    %1,%1,r3       \n\t" \
+      " acr    %2             \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i) : "r2", "r3");
 
 /* for squaring some of the terms are doubled... */
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      " mulu.d r2,%6,%7       \n\t"               \
-      " add    %0,%0,r2       \n\t"               \
-      " adc    %1,%1,r3       \n\t"               \
-      " acr    %2,            \n\t"               \
-      " add    %0,%0,r2       \n\t"               \
-      " adc    %1,%1,r3       \n\t"               \
-      " acr    %2,            \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "r2", "r3");
+#define SQRADD2(i, j)               \
+  asm(                              \
+      " mulu.d r2,%6,%7       \n\t" \
+      " add    %0,%0,r2       \n\t" \
+      " adc    %1,%1,r3       \n\t" \
+      " acr    %2,            \n\t" \
+      " add    %0,%0,r2       \n\t" \
+      " adc    %1,%1,r3       \n\t" \
+      " acr    %2,            \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "r2", "r3");
 
-#define SQRADDSC(i, j)                               \
-  asm(                                               \
-      " mulu.d r2,%6,%7        \n\t"                 \
-      " mov    %0,r2           \n\t"                 \
-      " mov    %1,r3           \n\t"                 \
-      " eor    %2,%2           \n\t"                 \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "r2", "r3");
+#define SQRADDSC(i, j)               \
+  asm(                               \
+      " mulu.d r2,%6,%7        \n\t" \
+      " mov    %0,r2           \n\t" \
+      " mov    %1,r3           \n\t" \
+      " eor    %2,%2           \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "r2", "r3");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      " mulu.d r2,%6,%7       \n\t"                  \
-      " add    %0,%0,r2       \n\t"                  \
-      " adc    %1,%1,r3       \n\t"                  \
-      " acr    %2             \n\t"                  \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "r2", "r3");
+#define SQRADDAC(i, j)              \
+  asm(                              \
+      " mulu.d r2,%6,%7       \n\t" \
+      " add    %0,%0,r2       \n\t" \
+      " adc    %1,%1,r3       \n\t" \
+      " acr    %2             \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "r2", "r3");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      " add    %0,%0,%3        \n\t"                            \
-      " adc    %1,%1,%4        \n\t"                            \
-      " adc    %2,%2,%5        \n\t"                            \
-      " add    %0,%0,%3        \n\t"                            \
-      " adc    %1,%1,%4        \n\t"                            \
-      " adc    %2,%2,%5        \n\t"                            \
-                                                                \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) \
-      : "cc");
+#define SQRADDDB                     \
+  asm(                               \
+      " add    %0,%0,%3        \n\t" \
+      " adc    %1,%1,%4        \n\t" \
+      " adc    %2,%2,%5        \n\t" \
+      " add    %0,%0,%3        \n\t" \
+      " adc    %1,%1,%4        \n\t" \
+      " adc    %2,%2,%5        \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) : "cc");
 
 #elif defined(TFM_MIPS)
 
@@ -19133,107 +18793,92 @@ clean:
 #define COMBA_FINI
 
 /* multiplies point i and j, updates carry "c1" and digit c2 */
-#define SQRADD(i, j)                      \
-  asm(                                    \
-      " multu  %6,%6          \n\t"       \
-      " mflo   $12            \n\t"       \
-      " mfhi   $13            \n\t"       \
-      " addu    %0,%0,$12     \n\t"       \
-      " sltu   $12,%0,$12     \n\t"       \
-      " addu    %1,%1,$13     \n\t"       \
-      " sltu   $13,%1,$13     \n\t"       \
-      " addu    %1,%1,$12     \n\t"       \
-      " sltu   $12,%1,$12     \n\t"       \
-      " addu    %2,%2,$13     \n\t"       \
-      " addu    %2,%2,$12     \n\t"       \
-                                          \
-      : "=r"(c0), "=r"(c1), "=r"(c2)      \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i) \
-      : "$12", "$13");
+#define SQRADD(i, j)                \
+  asm(                              \
+      " multu  %6,%6          \n\t" \
+      " mflo   $12            \n\t" \
+      " mfhi   $13            \n\t" \
+      " addu    %0,%0,$12     \n\t" \
+      " sltu   $12,%0,$12     \n\t" \
+      " addu    %1,%1,$13     \n\t" \
+      " sltu   $13,%1,$13     \n\t" \
+      " addu    %1,%1,$12     \n\t" \
+      " sltu   $12,%1,$12     \n\t" \
+      " addu    %2,%2,$13     \n\t" \
+      " addu    %2,%2,$12     \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i) : "$12", "$13");
 
 /* for squaring some of the terms are doubled... */
-#define SQRADD2(i, j)                             \
-  asm(                                            \
-      " multu  %6,%7          \n\t"               \
-      " mflo   $12            \n\t"               \
-      " mfhi   $13            \n\t"               \
-                                                  \
-      " addu    %0,%0,$12     \n\t"               \
-      " sltu   $14,%0,$12     \n\t"               \
-      " addu    %1,%1,$13     \n\t"               \
-      " sltu   $15,%1,$13     \n\t"               \
-      " addu    %1,%1,$14     \n\t"               \
-      " sltu   $14,%1,$14     \n\t"               \
-      " addu    %2,%2,$15     \n\t"               \
-      " addu    %2,%2,$14     \n\t"               \
-                                                  \
-      " addu    %0,%0,$12     \n\t"               \
-      " sltu   $14,%0,$12     \n\t"               \
-      " addu    %1,%1,$13     \n\t"               \
-      " sltu   $15,%1,$13     \n\t"               \
-      " addu    %1,%1,$14     \n\t"               \
-      " sltu   $14,%1,$14     \n\t"               \
-      " addu    %2,%2,$15     \n\t"               \
-      " addu    %2,%2,$14     \n\t"               \
-                                                  \
-      : "=r"(c0), "=r"(c1), "=r"(c2)              \
-      : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) \
-      : "$12", "$13", "$14", "$15");
+#define SQRADD2(i, j)               \
+  asm(                              \
+      " multu  %6,%7          \n\t" \
+      " mflo   $12            \n\t" \
+      " mfhi   $13            \n\t" \
+                                    \
+      " addu    %0,%0,$12     \n\t" \
+      " sltu   $14,%0,$12     \n\t" \
+      " addu    %1,%1,$13     \n\t" \
+      " sltu   $15,%1,$13     \n\t" \
+      " addu    %1,%1,$14     \n\t" \
+      " sltu   $14,%1,$14     \n\t" \
+      " addu    %2,%2,$15     \n\t" \
+      " addu    %2,%2,$14     \n\t" \
+                                    \
+      " addu    %0,%0,$12     \n\t" \
+      " sltu   $14,%0,$12     \n\t" \
+      " addu    %1,%1,$13     \n\t" \
+      " sltu   $15,%1,$13     \n\t" \
+      " addu    %1,%1,$14     \n\t" \
+      " sltu   $14,%1,$14     \n\t" \
+      " addu    %2,%2,$15     \n\t" \
+      " addu    %2,%2,$14     \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(i), "r"(j) : "$12", "$13", "$14", "$15");
 
-#define SQRADDSC(i, j)                               \
-  asm(                                               \
-      " multu  %6,%7          \n\t"                  \
-      " mflo   %0             \n\t"                  \
-      " mfhi   %1             \n\t"                  \
-      " xor    %2,%2,%2       \n\t"                  \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "cc");
+#define SQRADDSC(i, j)              \
+  asm(                              \
+      " multu  %6,%7          \n\t" \
+      " mflo   %0             \n\t" \
+      " mfhi   %1             \n\t" \
+      " xor    %2,%2,%2       \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "cc");
 
-#define SQRADDAC(i, j)                               \
-  asm(                                               \
-      " multu  %6,%7          \n\t"                  \
-      " mflo   $12            \n\t"                  \
-      " mfhi   $13            \n\t"                  \
-      " addu    %0,%0,$12     \n\t"                  \
-      " sltu   $12,%0,$12     \n\t"                  \
-      " addu    %1,%1,$13     \n\t"                  \
-      " sltu   $13,%1,$13     \n\t"                  \
-      " addu    %1,%1,$12     \n\t"                  \
-      " sltu   $12,%1,$12     \n\t"                  \
-      " addu    %2,%2,$13     \n\t"                  \
-      " addu    %2,%2,$12     \n\t"                  \
-                                                     \
-      : "=r"(sc0), "=r"(sc1), "=r"(sc2)              \
-      : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) \
-      : "$12", "$13", "$14");
+#define SQRADDAC(i, j)              \
+  asm(                              \
+      " multu  %6,%7          \n\t" \
+      " mflo   $12            \n\t" \
+      " mfhi   $13            \n\t" \
+      " addu    %0,%0,$12     \n\t" \
+      " sltu   $12,%0,$12     \n\t" \
+      " addu    %1,%1,$13     \n\t" \
+      " sltu   $13,%1,$13     \n\t" \
+      " addu    %1,%1,$12     \n\t" \
+      " sltu   $12,%1,$12     \n\t" \
+      " addu    %2,%2,$13     \n\t" \
+      " addu    %2,%2,$12     \n\t" \
+      : "=r"(sc0), "=r"(sc1), "=r"(sc2) : "0"(sc0), "1"(sc1), "2"(sc2), "r"(i), "r"(j) : "$12", "$13", "$14");
 
-#define SQRADDDB                                                \
-  asm(                                                          \
-      " addu    %0,%0,%3       \n\t"                            \
-      " sltu   $10,%0,%3       \n\t"                            \
-      " addu    %1,%1,$10      \n\t"                            \
-      " sltu   $10,%1,$10      \n\t"                            \
-      " addu    %1,%1,%4       \n\t"                            \
-      " sltu   $11,%1,%4       \n\t"                            \
-      " addu    %2,%2,$10      \n\t"                            \
-      " addu    %2,%2,$11      \n\t"                            \
-      " addu    %2,%2,%5       \n\t"                            \
-                                                                \
-      " addu    %0,%0,%3       \n\t"                            \
-      " sltu   $10,%0,%3       \n\t"                            \
-      " addu    %1,%1,$10      \n\t"                            \
-      " sltu   $10,%1,$10      \n\t"                            \
-      " addu    %1,%1,%4       \n\t"                            \
-      " sltu   $11,%1,%4       \n\t"                            \
-      " addu    %2,%2,$10      \n\t"                            \
-      " addu    %2,%2,$11      \n\t"                            \
-      " addu    %2,%2,%5       \n\t"                            \
-                                                                \
-      : "=r"(c0), "=r"(c1), "=r"(c2)                            \
-      : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) \
-      : "$10", "$11");
+#define SQRADDDB                     \
+  asm(                               \
+      " addu    %0,%0,%3       \n\t" \
+      " sltu   $10,%0,%3       \n\t" \
+      " addu    %1,%1,$10      \n\t" \
+      " sltu   $10,%1,$10      \n\t" \
+      " addu    %1,%1,%4       \n\t" \
+      " sltu   $11,%1,%4       \n\t" \
+      " addu    %2,%2,$10      \n\t" \
+      " addu    %2,%2,$11      \n\t" \
+      " addu    %2,%2,%5       \n\t" \
+                                     \
+      " addu    %0,%0,%3       \n\t" \
+      " sltu   $10,%0,%3       \n\t" \
+      " addu    %1,%1,$10      \n\t" \
+      " sltu   $10,%1,$10      \n\t" \
+      " addu    %1,%1,%4       \n\t" \
+      " sltu   $11,%1,%4       \n\t" \
+      " addu    %2,%2,$10      \n\t" \
+      " addu    %2,%2,$11      \n\t" \
+      " addu    %2,%2,%5       \n\t" \
+      : "=r"(c0), "=r"(c1), "=r"(c2) : "r"(sc0), "r"(sc1), "r"(sc2), "0"(c0), "1"(c1), "2"(c2) : "$10", "$11");
 
 #else
 
@@ -19326,13 +18971,17 @@ clean:
 
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR12) && FP_SIZE >= 24
-void fp_sqr_comba12(fp_int *A, fp_int *B)
+void fp_sqr_comba12(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[24], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[24], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -19534,13 +19183,17 @@ void fp_sqr_comba12(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR17) && FP_SIZE >= 34
-void fp_sqr_comba17(fp_int *A, fp_int *B)
+void fp_sqr_comba17(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[34], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[34], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -19867,13 +19520,17 @@ void fp_sqr_comba17(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR20) && FP_SIZE >= 40
-void fp_sqr_comba20(fp_int *A, fp_int *B)
+void fp_sqr_comba20(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[40], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[40], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -20287,13 +19944,17 @@ void fp_sqr_comba20(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR24) && FP_SIZE >= 48
-void fp_sqr_comba24(fp_int *A, fp_int *B)
+void fp_sqr_comba24(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[48], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[48], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -20837,13 +20498,17 @@ void fp_sqr_comba24(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR28) && FP_SIZE >= 56
-void fp_sqr_comba28(fp_int *A, fp_int *B)
+void fp_sqr_comba28(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[56], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[56], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -21533,13 +21198,16 @@ void fp_sqr_comba28(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR3) && FP_SIZE >= 6
-void fp_sqr_comba3(fp_int *A, fp_int *B)
+void fp_sqr_comba3(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[6], c0, c1, c2 /*, sc0 = 0, sc1 = 0, sc2 = 0*/;
+  const fp_digit *a;
+  fp_digit b[6], c0, c1, c2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -21584,13 +21252,17 @@ void fp_sqr_comba3(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR32) && FP_SIZE >= 64
-void fp_sqr_comba32(fp_int *A, fp_int *B)
+void fp_sqr_comba32(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[64], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[64], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -22442,13 +22114,16 @@ void fp_sqr_comba32(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR4) && FP_SIZE >= 8
-void fp_sqr_comba4(fp_int *A, fp_int *B)
+void fp_sqr_comba4(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[8], c0, c1, c2 /*, sc0 = 0, sc1 = 0, sc2 = 0*/;
+  const fp_digit *a;
+  fp_digit b[8], c0, c1, c2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -22505,13 +22180,17 @@ void fp_sqr_comba4(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR48) && FP_SIZE >= 96
-void fp_sqr_comba48(fp_int *A, fp_int *B)
+void fp_sqr_comba48(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[96], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[96], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -24171,13 +23850,17 @@ void fp_sqr_comba48(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR6) && FP_SIZE >= 12
-void fp_sqr_comba6(fp_int *A, fp_int *B)
+void fp_sqr_comba6(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[12], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[12], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -24262,13 +23945,17 @@ void fp_sqr_comba6(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR64) && FP_SIZE >= 128
-void fp_sqr_comba64(fp_int *A, fp_int *B)
+void fp_sqr_comba64(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[128], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[128], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -26992,13 +26679,17 @@ void fp_sqr_comba64(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR7) && FP_SIZE >= 14
-void fp_sqr_comba7(fp_int *A, fp_int *B)
+void fp_sqr_comba7(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[14], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[14], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -27100,13 +26791,17 @@ void fp_sqr_comba7(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR8) && FP_SIZE >= 16
-void fp_sqr_comba8(fp_int *A, fp_int *B)
+void fp_sqr_comba8(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[16], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[16], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -27226,13 +26921,17 @@ void fp_sqr_comba8(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SQR9) && FP_SIZE >= 18
-void fp_sqr_comba9(fp_int *A, fp_int *B)
+void fp_sqr_comba9(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[18], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[18], c0, c1, c2;
+  fp_digit sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -27371,11 +27070,13 @@ void fp_sqr_comba9(fp_int *A, fp_int *B)
 }
 #endif
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 /* generic comba squarer */
-void fp_sqr_comba(fp_int *A, fp_int *B)
+void fp_sqr_comba(const fp_int *A, fp_int *B)
 {
   int pa, ix, iz;
   fp_digit c0, c1, c2;
@@ -27409,7 +27110,7 @@ void fp_sqr_comba(fp_int *A, fp_int *B)
   for (ix = 0; ix < pa; ix++)
   {
     int tx, ty, iy;
-    fp_digit *tmpy, *tmpx;
+    const fp_digit *tmpy, *tmpx;
 
     /* get offsets into the two bignums */
     ty = MIN(A->used - 1, ix);
@@ -27420,15 +27121,15 @@ void fp_sqr_comba(fp_int *A, fp_int *B)
     tmpy = A->dp + ty;
 
     /* this is the number of times the loop will iterrate,
-         while (tx++ < a->used && ty-- >= 0) { ... }
-       */
+       while (tx++ < a->used && ty-- >= 0) { ... }
+     */
     iy = MIN(A->used - tx, ty + 1);
 
-    /* now for squaring tx can never equal ty 
-       * we halve the distance since they approach 
-       * at a rate of 2x and we have to round because 
-       * odd cases need to be executed
-       */
+    /* now for squaring tx can never equal ty
+     * we halve the distance since they approach
+     * at a rate of 2x and we have to round because
+     * odd cases need to be executed
+     */
     iy = MIN(iy, (ty - tx + 1) >> 1);
 
     /* forward carries */
@@ -27464,13 +27165,16 @@ void fp_sqr_comba(fp_int *A, fp_int *B)
   }
 }
 
+#ifndef TFM_PRE_GEN_MPI_C
 #define TFM_DEFINES
-//#include "fp_sqr_comba.c"
+#include "fp_sqr_comba.c"
+#endif
 
 #if defined(TFM_SMALL_SET)
-void fp_sqr_comba_small(fp_int *A, fp_int *B)
+void fp_sqr_comba_small(const fp_int *A, fp_int *B)
 {
-  fp_digit *a, b[32], c0, c1, c2, sc0 = 0, sc1 = 0, sc2 = 0;
+  const fp_digit *a;
+  fp_digit b[32], c0, c1, c2, sc0, sc1, sc2;
 #ifdef TFM_ISO
   fp_word tt;
 #endif
@@ -29666,7 +29370,7 @@ void fp_sqr_comba_small(fp_int *A, fp_int *B)
 #endif /* TFM_SMALL_SET */
 
 /* c = a * a (mod b) */
-int fp_sqrmod(fp_int *a, fp_int *b, fp_int *c)
+int fp_sqrmod(const fp_int *a, const fp_int *b, fp_int *c)
 {
   fp_int tmp;
   fp_zero(&tmp);
@@ -29769,5 +29473,3 @@ int fp_tstbit(const fp_int a, int bit_index)
   fp_and(&a, &b, &c);
   return (fp_iszero(&c) == FP_NO);
 }
-
-/* EOF */

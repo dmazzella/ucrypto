@@ -3,7 +3,7 @@
  * Porting to Micropython
  * Copyright (c) 2016-2025 Damiano Mazzella
  *
-*/
+ */
 
 /* TomsFastMath, a fast ISO C bignum library.
  *
@@ -28,8 +28,49 @@
  * Patch
  * Development - 00=release, 01=in-development
  */
-#define TFM_VERSION 0x000D0101
-#define TFM_VERSION_S "v0.13.1-next"
+#define TFM_VERSION_MAJ 0
+#define TFM_VERSION_MIN 13
+#define TFM_VERSION_PAT 1
+#define TFM_VERSION_DEV 1
+
+#define TFM_VERSION PRIVATE__TFM_VERSION_4(TFM_VERSION_MAJ, \
+                                           TFM_VERSION_MIN, \
+                                           TFM_VERSION_PAT, \
+                                           TFM_VERSION_DEV)
+
+#define TFM_VERSION_S PRIVATE__TFM_CONC(TFM_VERSION_MAJ, \
+                                        TFM_VERSION_MIN, \
+                                        TFM_VERSION_PAT, \
+                                        TFM_VERSION_DEV)
+
+/* Please use the `TFM_VERSION_3()` macro if you want to compile-time check
+ * for a specific TFM version.
+ * Your code could look as follows:
+
+#if TFM_VERSION <= TFM_VERSION_3(0, 13, 1)
+// do stuff to work with old TFM
+#else
+// do stuff to work with new TFM
+#endif
+
+ */
+
+#define TFM_VERSION_3(maj, min, pat) PRIVATE__TFM_VERSION_4(maj, min, pat, 0)
+
+/* Private stuff from here on.
+ * As said by Stanley Kirk Burrell in 1989 "You can't touch this" */
+#define PRIVATE__TFM_VERSION_4(maj, min, pat, dev) ((maj) << 24 | (min) << 16 | (pat) << 8 | (dev))
+
+#define PRIVATE__TFM_VERSION_DEV_STR_0
+#define PRIVATE__TFM_VERSION_DEV_STR_1 "-next"
+
+#define PRIVATE__TFM_VERSION_PASTE(v) PRIVATE__TFM_VERSION_DEV_STR_##v
+#define PRIVATE__TFM_VERSION_DEV_STR(v) PRIVATE__TFM_VERSION_PASTE(v)
+
+#define PRIVATE__TFM_STR(s) #s
+#define PRIVATE__TFM_CONC(maj, min, pat, dev) "v" PRIVATE__TFM_STR(maj) "." PRIVATE__TFM_STR(min) "." PRIVATE__TFM_STR(pat) \
+    PRIVATE__TFM_VERSION_DEV_STR(dev)
+/* End of private stuff */
 
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -373,7 +414,7 @@ typedef unsigned long long ulong64;
 
 typedef ulong64 fp_digit;
 #define SIZEOF_FP_DIGIT 8
-#define DIGIT_SHIFT     6
+#define DIGIT_SHIFT 6
 typedef unsigned long fp_word __attribute__((mode(TI)));
 
 #else
@@ -391,12 +432,12 @@ typedef signed long long long64;
 
 typedef unsigned int fp_digit;
 #define SIZEOF_FP_DIGIT 4
-#define DIGIT_SHIFT     5
+#define DIGIT_SHIFT 5
 typedef ulong64 fp_word;
 #endif /* FP_64BIT */
 
 /* # of digits this is */
-#define DIGIT_BIT ((CHAR_BIT)*SIZEOF_FP_DIGIT)
+#define DIGIT_BIT ((CHAR_BIT) * SIZEOF_FP_DIGIT)
 #define FP_MASK (fp_digit)(-1)
 #define FP_SIZE (FP_MAX_SIZE / DIGIT_BIT)
 
@@ -427,6 +468,7 @@ typedef struct
 } fp_int;
 
 /* functions */
+
 char fp_to_upper(char str);
 
 /* returns a TFM ident string useful for debugging... */
@@ -438,7 +480,7 @@ const char *fp_ident(void);
 
 /* zero/even/odd ? */
 #define fp_iszero(a) (((a)->used == 0) ? FP_YES : FP_NO)
-#define fp_iseven(a) (((a)->used >= 0 && (((a)->dp[0] & 1) == 0)) ? FP_YES : FP_NO)
+#define fp_iseven(a) (((a)->used == 0 || (((a)->dp[0] & 1) == 0)) ? FP_YES : FP_NO)
 #define fp_isodd(a) (((a)->used > 0 && (((a)->dp[0] & 1) == 1)) ? FP_YES : FP_NO)
 
 /* set to a small digit */
@@ -480,104 +522,104 @@ void fp_rshd(fp_int *a, int x);
 void fp_lshd(fp_int *a, int x);
 
 /* signed comparison */
-int fp_cmp(fp_int *a, fp_int *b);
+int fp_cmp(const fp_int *a, const fp_int *b);
 
 /* unsigned comparison */
-int fp_cmp_mag(fp_int *a, fp_int *b);
+int fp_cmp_mag(const fp_int *a, const fp_int *b);
 
 /* power of 2 operations */
-void fp_div_2d(fp_int *a, int b, fp_int *c, fp_int *d);
-void fp_mod_2d(fp_int *a, int b, fp_int *c);
-void fp_mul_2d(fp_int *a, int b, fp_int *c);
+void fp_div_2d(const fp_int *a, int b, fp_int *c, fp_int *d);
+void fp_mod_2d(const fp_int *a, int b, fp_int *c);
+void fp_mul_2d(const fp_int *a, int b, fp_int *c);
 void fp_2expt(fp_int *a, int b);
-void fp_mul_2(fp_int *a, fp_int *c);
-void fp_div_2(fp_int *a, fp_int *c);
+void fp_mul_2(const fp_int *a, fp_int *c);
+void fp_div_2(const fp_int *a, fp_int *c);
 
 /* Counts the number of lsbs which are zero before the first zero bit */
-int fp_cnt_lsb(fp_int *a);
+int fp_cnt_lsb(const fp_int *a);
 
 /* c = a + b */
-void fp_add(fp_int *a, fp_int *b, fp_int *c);
+void fp_add(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* c = a - b */
-void fp_sub(fp_int *a, fp_int *b, fp_int *c);
+void fp_sub(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* c = a * b */
-void fp_mul(fp_int *a, fp_int *b, fp_int *c);
+void fp_mul(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* b = a*a  */
-void fp_sqr(fp_int *a, fp_int *b);
+void fp_sqr(const fp_int *a, fp_int *b);
 
 /* a/b => cb + d == a */
-int fp_div(fp_int *a, fp_int *b, fp_int *c, fp_int *d);
+int fp_div(const fp_int *a, const fp_int *b, fp_int *c, fp_int *d);
 
 /* c = a mod b, 0 <= c < b  */
-int fp_mod(fp_int *a, fp_int *b, fp_int *c);
+int fp_mod(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* compare against a single digit */
-int fp_cmp_d(fp_int *a, fp_digit b);
+int fp_cmp_d(const fp_int *a, fp_digit b);
 
 /* c = a + b */
-void fp_add_d(fp_int *a, fp_digit b, fp_int *c);
+void fp_add_d(const fp_int *a, fp_digit b, fp_int *c);
 
 /* c = a - b */
-void fp_sub_d(fp_int *a, fp_digit b, fp_int *c);
+void fp_sub_d(const fp_int *a, fp_digit b, fp_int *c);
 
 /* c = a * b */
-void fp_mul_d(fp_int *a, fp_digit b, fp_int *c);
+void fp_mul_d(const fp_int *a, fp_digit b, fp_int *c);
 
 /* a/b => cb + d == a */
-int fp_div_d(fp_int *a, fp_digit b, fp_int *c, fp_digit *d);
+int fp_div_d(const fp_int *a, fp_digit b, fp_int *c, fp_digit *d);
 
 /* c = a mod b, 0 <= c < b  */
-int fp_mod_d(fp_int *a, fp_digit b, fp_digit *c);
+int fp_mod_d(const fp_int *a, fp_digit b, fp_digit *c);
 
 /* ---> number theory <--- */
 /* d = a + b (mod c) */
-int fp_addmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d);
+int fp_addmod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d);
 
 /* d = a - b (mod c) */
-int fp_submod(fp_int *a, fp_int *b, fp_int *c, fp_int *d);
+int fp_submod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d);
 
 /* d = a * b (mod c) */
-int fp_mulmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d);
+int fp_mulmod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d);
 
 /* c = a * a (mod b) */
-int fp_sqrmod(fp_int *a, fp_int *b, fp_int *c);
+int fp_sqrmod(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* c = 1/a (mod b) */
-int fp_invmod(fp_int *a, fp_int *b, fp_int *c);
+int fp_invmod(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* c = (a, b) */
-void fp_gcd(fp_int *a, fp_int *b, fp_int *c);
+void fp_gcd(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* c = [a, b] */
-void fp_lcm(fp_int *a, fp_int *b, fp_int *c);
+void fp_lcm(const fp_int *a, const fp_int *b, fp_int *c);
 
 /* setups the montgomery reduction */
-int fp_montgomery_setup(fp_int *a, fp_digit *mp);
+int fp_montgomery_setup(const fp_int *a, fp_digit *mp);
 
 /* computes a = B**n mod b without division or multiplication useful for
  * normalizing numbers in a Montgomery system.
  */
-void fp_montgomery_calc_normalization(fp_int *a, fp_int *b);
+void fp_montgomery_calc_normalization(fp_int *a, const fp_int *b);
 
 /* computes x/R == x (mod N) via Montgomery Reduction */
-void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp);
+void fp_montgomery_reduce(fp_int *a, const fp_int *m, fp_digit mp);
 
 /* d = a**b (mod c) */
-int fp_exptmod(fp_int *a, fp_int *b, fp_int *c, fp_int *d);
+int fp_exptmod(const fp_int *a, const fp_int *b, const fp_int *c, fp_int *d);
 
 /* primality stuff */
 
 /* perform a Miller-Rabin test of a to the base b and store result in "result" */
-void fp_prime_miller_rabin(fp_int *a, fp_int *b, int *result);
+void fp_prime_miller_rabin(const fp_int *a, const fp_int *b, int *result);
 
 #define FP_PRIME_SIZE 256
 /* 256 trial divisions + 8 Miller-Rabins, returns FP_YES if probable prime  */
-int fp_isprime(fp_int *a);
+int fp_isprime(const fp_int *a);
 /* extended version of fp_isprime, do 't' Miller-Rabins instead of only 8 */
-int fp_isprime_ex(fp_int *a, int t);
+int fp_isprime_ex(const fp_int *a, int t);
 
 /* Primality generation flags */
 #define TFM_PRIME_BBS 0x0001      /* BBS style prime */
@@ -588,132 +630,144 @@ int fp_isprime_ex(fp_int *a, int t);
 /* callback for fp_prime_random, should fill dst with random bytes and return how many read [upto len] */
 typedef int tfm_prime_callback(unsigned char *dst, int len, void *dat);
 
-#define fp_prime_random(a, t, size, bbs, cb, dat) fp_prime_random_ex(a, t, ((size)*8) + 1, (bbs == 1) ? TFM_PRIME_BBS : 0, cb, dat)
+#define fp_prime_random(a, t, size, bbs, cb, dat) fp_prime_random_ex(a, t, ((size) * 8) + 1, (bbs == 1) ? TFM_PRIME_BBS : 0, cb, dat)
 
 int fp_prime_random_ex(fp_int *a, int t, int size, int flags, tfm_prime_callback cb, void *dat);
 
-/* radix conersions */
-int fp_count_bits(fp_int *a);
+/* radix conversions */
+int fp_count_bits(const fp_int *a);
 
-int fp_unsigned_bin_size(fp_int *a);
+int fp_unsigned_bin_size(const fp_int *a);
 void fp_read_unsigned_bin(fp_int *a, const unsigned char *b, int c);
-void fp_to_unsigned_bin(fp_int *a, unsigned char *b);
+void fp_to_unsigned_bin(const fp_int *a, unsigned char *b);
 
-int fp_signed_bin_size(fp_int *a);
+int fp_signed_bin_size(const fp_int *a);
 void fp_read_signed_bin(fp_int *a, const unsigned char *b, int c);
-void fp_to_signed_bin(fp_int *a, unsigned char *b);
+void fp_to_signed_bin(const fp_int *a, unsigned char *b);
 
 int fp_read_radix(fp_int *a, const char *str, int radix);
 
-int fp_radix_size(fp_int *a, int radix, int *size);
-int fp_toradix(fp_int *a, char *str, int radix);
-int fp_toradix_n(fp_int *a, char *str, int radix, int maxlen);
+int fp_radix_size(const fp_int *a, int radix, int *size);
+int fp_toradix(const fp_int *a, char *str, int radix);
+int fp_toradix_n(const fp_int *a, char *str, int radix, int maxlen);
+/*
+ * Private symbols
+ * ---------------
+ *
+ * On Unix symbols can be marked as hidden if tomsfastmath is compiled
+ * as a shared object. By default, symbols are visible.
+ */
+#if defined(__GNUC__) && __GNUC__ >= 4 && !defined(_WIN32) && !defined(__CYGWIN__)
+#define FP_PRIVATE __attribute__((visibility("hidden")))
+#else
+#define FP_PRIVATE
+#endif
 
 /* VARIOUS LOW LEVEL STUFFS */
-void s_fp_add(fp_int *a, fp_int *b, fp_int *c);
-void s_fp_sub(fp_int *a, fp_int *b, fp_int *c);
-void fp_reverse(unsigned char *s, int len);
+FP_PRIVATE void s_fp_add(const fp_int *a, const fp_int *b, fp_int *c);
+FP_PRIVATE void s_fp_sub(const fp_int *a, const fp_int *b, fp_int *c);
+FP_PRIVATE void fp_reverse(unsigned char *s, int len);
 
-void fp_mul_comba(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba(const fp_int *A, const fp_int *B, fp_int *C);
 
 #ifdef TFM_SMALL_SET
-void fp_mul_comba_small(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba_small(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 
 #ifdef TFM_MUL3
-void fp_mul_comba3(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba3(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL4
-void fp_mul_comba4(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba4(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL6
-void fp_mul_comba6(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba6(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL7
-void fp_mul_comba7(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba7(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL8
-void fp_mul_comba8(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba8(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL9
-void fp_mul_comba9(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba9(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL12
-void fp_mul_comba12(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba12(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL17
-void fp_mul_comba17(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba17(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 
 #ifdef TFM_MUL20
-void fp_mul_comba20(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba20(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL24
-void fp_mul_comba24(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba24(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL28
-void fp_mul_comba28(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba28(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL32
-void fp_mul_comba32(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba32(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL48
-void fp_mul_comba48(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba48(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 #ifdef TFM_MUL64
-void fp_mul_comba64(fp_int *A, fp_int *B, fp_int *C);
+FP_PRIVATE void fp_mul_comba64(const fp_int *A, const fp_int *B, fp_int *C);
 #endif
 
-void fp_sqr_comba(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba(const fp_int *A, fp_int *B);
 
 #ifdef TFM_SMALL_SET
-void fp_sqr_comba_small(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba_small(const fp_int *A, fp_int *B);
 #endif
 
 #ifdef TFM_SQR3
-void fp_sqr_comba3(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba3(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR4
-void fp_sqr_comba4(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba4(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR6
-void fp_sqr_comba6(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba6(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR7
-void fp_sqr_comba7(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba7(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR8
-void fp_sqr_comba8(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba8(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR9
-void fp_sqr_comba9(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba9(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR12
-void fp_sqr_comba12(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba12(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR17
-void fp_sqr_comba17(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba17(const fp_int *A, fp_int *B);
 #endif
 
 #ifdef TFM_SQR20
-void fp_sqr_comba20(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba20(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR24
-void fp_sqr_comba24(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba24(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR28
-void fp_sqr_comba28(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba28(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR32
-void fp_sqr_comba32(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba32(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR48
-void fp_sqr_comba48(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba48(const fp_int *A, fp_int *B);
 #endif
 #ifdef TFM_SQR64
-void fp_sqr_comba64(fp_int *A, fp_int *B);
+FP_PRIVATE void fp_sqr_comba64(const fp_int *A, fp_int *B);
 #endif
-extern const char *fp_s_rmap;
+FP_PRIVATE extern const char *fp_s_rmap;
 
 void fp_and(const fp_int *a, const fp_int *b, fp_int *c);
 void fp_or(const fp_int *a, const fp_int *b, fp_int *c);
